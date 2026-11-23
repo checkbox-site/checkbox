@@ -1060,6 +1060,108 @@ export const OPERATIONS = {
     paginated: false,
     summary: "Record a due notice as missed",
   },
+  listNoticeCohorts: {
+    operationId: "listNoticeCohorts",
+    namespace: "noticeCohorts",
+    method: "list",
+    httpMethod: "GET",
+    path: "/v1/notices/cohorts",
+    pathParams: [],
+    queryParams: ["site","schedule"],
+    body: false,
+    idempotent: false,
+    auth: true,
+    scope: "notices:read",
+    response: "json",
+    list: false,
+    paginated: false,
+    summary: "List notice cohorts",
+  },
+  createNoticePlan: {
+    operationId: "createNoticePlan",
+    namespace: "noticePlans",
+    method: "create",
+    httpMethod: "POST",
+    path: "/v1/notices/plans",
+    pathParams: [],
+    queryParams: [],
+    body: true,
+    idempotent: false,
+    auth: true,
+    scope: "notices:write",
+    response: "json",
+    list: false,
+    paginated: false,
+    summary: "Create a notice plan (dry run)",
+  },
+  retrieveNoticePlan: {
+    operationId: "retrieveNoticePlan",
+    namespace: "noticePlans",
+    method: "retrieve",
+    httpMethod: "GET",
+    path: "/v1/notices/plans/{plan}",
+    pathParams: ["plan"],
+    queryParams: [],
+    body: false,
+    idempotent: false,
+    auth: true,
+    scope: "notices:read",
+    response: "json",
+    list: false,
+    paginated: false,
+    summary: "Retrieve a notice plan",
+  },
+  approveNoticePlan: {
+    operationId: "approveNoticePlan",
+    namespace: "noticePlans",
+    method: "approve",
+    httpMethod: "POST",
+    path: "/v1/notices/plans/{plan}/approve",
+    pathParams: ["plan"],
+    queryParams: [],
+    body: false,
+    idempotent: true,
+    auth: true,
+    scope: "notices:write",
+    response: "json",
+    list: false,
+    paginated: false,
+    summary: "Approve a notice plan",
+  },
+  retrieveStripeEmails: {
+    operationId: "retrieveStripeEmails",
+    namespace: "stripeEmails",
+    method: "retrieve",
+    httpMethod: "GET",
+    path: "/v1/notices/stripe-emails",
+    pathParams: [],
+    queryParams: ["site"],
+    body: false,
+    idempotent: false,
+    auth: true,
+    scope: "notices:read",
+    response: "json",
+    list: false,
+    paginated: false,
+    summary: "Retrieve the Stripe email answer",
+  },
+  setStripeEmails: {
+    operationId: "setStripeEmails",
+    namespace: "stripeEmails",
+    method: "set",
+    httpMethod: "POST",
+    path: "/v1/notices/stripe-emails",
+    pathParams: [],
+    queryParams: [],
+    body: true,
+    idempotent: true,
+    auth: true,
+    scope: "notices:write",
+    response: "json",
+    list: false,
+    paginated: false,
+    summary: "Set the Stripe email answer",
+  },
   listLawUpdates: {
     operationId: "listLawUpdates",
     namespace: "lawUpdates",
@@ -2047,6 +2149,12 @@ export interface OperationTypes {
   retrieveDueNotice: { args: { notice: string }; response: T.DueNotice };
   markNoticeSent: { args: { notice: string } & T.MarkNoticeSentParams; response: T.DueNotice };
   markNoticeMissed: { args: { notice: string } & T.MarkNoticeMissedParams; response: T.DueNotice };
+  listNoticeCohorts: { args: T.ListNoticeCohortsParams; response: T.NoticeCohortList };
+  createNoticePlan: { args: T.CreateNoticePlanParams; response: T.NoticePlan };
+  retrieveNoticePlan: { args: { plan: string }; response: T.NoticePlan };
+  approveNoticePlan: { args: { plan: string }; response: T.NoticePlan };
+  retrieveStripeEmails: { args: T.RetrieveStripeEmailsParams; response: T.StripeEmails };
+  setStripeEmails: { args: T.SetStripeEmailsParams; response: T.StripeEmails };
   listLawUpdates: { args: T.ListLawUpdatesParams; response: T.LawUpdateList };
   retrieveLawUpdate: { args: { law_update: string }; response: T.LawUpdate };
   checkDisclosure: { args: T.DisclosureCheckParams; response: T.DisclosureCheckResult };
@@ -2914,6 +3022,86 @@ export class NoticesResource extends Resource {
 
 }
 
+/** `checkbox.noticeCohorts` */
+export class NoticeCohortsResource extends Resource {
+  /**
+   * List notice cohorts.
+   *
+   * Every active subscription of the site grouped by the required notice it is owed: notice kind × plan × the rules that require it, with the send window, the next send date, the subscribers (billing-platform ids) and where their state came from. Subscriptions owed nothing right now are counted in no_notice_required, so the totals add up. Live keys see live subscribers, test keys test-mode ones. Pass schedule= to preview the other schedule without saving.
+   *
+   * @see GET /v1/notices/cohorts (operation `listNoticeCohorts`, scope `notices:read`)
+   */
+  list(params: T.ListNoticeCohortsParams, options?: RequestOptions): Promise<T.NoticeCohortList> {
+    return this._request(OPERATIONS.listNoticeCohorts, [], params, options) as Promise<T.NoticeCohortList>;
+  }
+
+}
+
+/** `checkbox.noticePlans` */
+export class NoticePlansResource extends Resource {
+  /**
+   * Create a notice plan (dry run).
+   *
+   * Computes the notice cohorts under a schedule and stores them as a plan you can approve for 24 hours. Nothing changes until you approve it with approveNoticePlan. Approval is refused if the subscribers, their terms, your states or the rules changed since this dry run.
+   *
+   * @see POST /v1/notices/plans (operation `createNoticePlan`, scope `notices:write`)
+   */
+  create(params: T.CreateNoticePlanParams, options?: RequestOptions): Promise<T.NoticePlan> {
+    return this._request(OPERATIONS.createNoticePlan, [], params, options) as Promise<T.NoticePlan>;
+  }
+
+  /**
+   * Retrieve a notice plan.
+   *
+   * A dry run of the notice cohorts, with its status (draft, approved or expired).
+   *
+   * @param plan Unique identifier of the notice plan (ntcp_…).
+   * @see GET /v1/notices/plans/{plan} (operation `retrieveNoticePlan`, scope `notices:read`)
+   */
+  retrieve(plan: string, options?: RequestOptions): Promise<T.NoticePlan> {
+    return this._request(OPERATIONS.retrieveNoticePlan, [plan], undefined, options) as Promise<T.NoticePlan>;
+  }
+
+  /**
+   * Approve a notice plan.
+   *
+   * Approves a dry run and switches the site to its schedule. Refused (409) when the plan expired or when the subscribers, their terms, your states or the rules changed since the dry run: run createNoticePlan again and approve the new plan. Idempotent.
+   *
+   * @param plan Unique identifier of the notice plan (ntcp_…).
+   * @see POST /v1/notices/plans/{plan}/approve (operation `approveNoticePlan`, scope `notices:write`)
+   */
+  approve(plan: string, options?: RequestOptions): Promise<T.NoticePlan> {
+    return this._request(OPERATIONS.approveNoticePlan, [plan], undefined, options) as Promise<T.NoticePlan>;
+  }
+
+}
+
+/** `checkbox.stripeEmails` */
+export class StripeEmailsResource extends Resource {
+  /**
+   * Retrieve the Stripe email answer.
+   *
+   * Whether Stripe's own renewal and trial emails are on (as you told Checkbox), and what to do with them given your plans.
+   *
+   * @see GET /v1/notices/stripe-emails (operation `retrieveStripeEmails`, scope `notices:read`)
+   */
+  retrieve(params: T.RetrieveStripeEmailsParams, options?: RequestOptions): Promise<T.StripeEmails> {
+    return this._request(OPERATIONS.retrieveStripeEmails, [], params, options) as Promise<T.StripeEmails>;
+  }
+
+  /**
+   * Set the Stripe email answer.
+   *
+   * Tells Checkbox whether Stripe sends its "upcoming renewal" email (and how many days before renewal) and its 7-day trial reminder. Stripe has no API for these settings. Returns what to do with each: one Stripe setting cannot fit monthly and annual plans at once, and a lead under 15 days is too late for California and New York annual renewals.
+   *
+   * @see POST /v1/notices/stripe-emails (operation `setStripeEmails`, scope `notices:write`)
+   */
+  set(params: T.SetStripeEmailsParams, options?: RequestOptions): Promise<T.StripeEmails> {
+    return this._request(OPERATIONS.setStripeEmails, [], params, options) as Promise<T.StripeEmails>;
+  }
+
+}
+
 /** `checkbox.lawUpdates` */
 export class LawUpdatesResource extends Resource {
   /**
@@ -3641,6 +3829,9 @@ export const RESOURCES = {
   noticeSends: NoticeSendsResource,
   noticeSettings: NoticeSettingsResource,
   notices: NoticesResource,
+  noticeCohorts: NoticeCohortsResource,
+  noticePlans: NoticePlansResource,
+  stripeEmails: StripeEmailsResource,
   lawUpdates: LawUpdatesResource,
   checks: ChecksResource,
   visitorRegions: VisitorRegionsResource,

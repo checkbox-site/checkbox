@@ -3269,6 +3269,213 @@ export interface MarkNoticeMissedParams {
   reason?: string;
 }
 
+/** Subscribers owed the same notice under the same rules. */
+export interface NoticeCohort {
+  /** Cohort id: stable for the same notice kind, plan and requirements. */
+  id: string;
+  /** Notice kind (acknowledgment, trial_ending, renewal_reminder, annual_terms, price_change). */
+  kind: string;
+  /** Human label of the kind. */
+  label: string;
+  /** The plan these subscribers are on. */
+  plan: {
+    /** Product name as the billing platform reports it. */
+    product?: string;
+    /** Price in the smallest currency unit. */
+    amount?: number;
+    /** ISO currency code (lowercase). */
+    currency?: string;
+    /** Billing interval. */
+    interval?: string;
+    /** Intervals per charge. */
+    interval_count?: number;
+  };
+  /** Why the notice is sent: "law" (a catalog requirement makes it mandatory). */
+  required: "law";
+  /** The rules that make this notice required (not legal advice). */
+  requirements: Array<{
+    /** Catalog requirement id. */
+    id: string;
+    /** Jurisdiction. */
+    jurisdiction: string;
+    /** Citation. */
+    citation: string;
+    /** Requirement title. */
+    title?: string;
+  }>;
+  /** Jurisdictions the send windows satisfy. */
+  jurisdictions: Array<string>;
+  /** Subscribers in this cohort. */
+  subscriptions: number;
+  /** Billing-platform subscription ids (at most 500; see subscription_ids_truncated). */
+  subscription_ids: Array<string>;
+  /** True when subscription_ids lists only the first 500. */
+  subscription_ids_truncated: boolean;
+  /** Where the subscriber's state came from. */
+  state_basis: {
+    /** Subscribers whose billing state decided their window. */
+    billing_state: number;
+    /** Subscribers with no billing state: every state the site sells in applies. */
+    unknown: number;
+  };
+  /** When the notice may be sent. */
+  window: {
+    /** Shortest lead, in days before the event the notice announces. */
+    min_days_before: number;
+    /** Longest lead. */
+    max_days_before: number;
+    /** The window in words. */
+    description: string;
+  };
+  /** Earliest recommended send time ahead (unix seconds), or null. */
+  next_send_date: number | null;
+  /** Notices of this cohort due in the next 30 days. */
+  sends_next_30_days: number;
+  /** Notices whose window already closed (send now; recorded as late). */
+  late: number;
+}
+
+export interface NoticeCohortWarning {
+  /** unknown_state, late_notices, stripe_may_also_send or stripe_question_unanswered. */
+  code: string;
+  /** How much it matters. */
+  severity: "info" | "medium" | "high";
+  /** What it means and what to do. */
+  message: string;
+  /** The cohort it is about. */
+  cohort?: string;
+  /** Subscribers or notices concerned. */
+  count?: number;
+  /** Share of subscribers concerned (0–1). */
+  share?: number;
+}
+
+/** Who is owed which required notice, grouped into cohorts. Every active subscription is in a cohort or counted in no_notice_required. */
+export interface NoticeCohortList {
+  /** Always "notice_cohort_list". */
+  object: "notice_cohort_list";
+  /** Site id. */
+  site: string;
+  /** Live or test-mode subscribers. */
+  livemode: boolean;
+  /** simple: one send per notice inside every applicable state's window. minimum_per_state: only what each subscriber's billing state requires (unknown state: every state you sell in). */
+  schedule: "simple" | "minimum_per_state";
+  /** Active subscriptions considered. */
+  active_subscriptions: number;
+  /** Active subscriptions owed no required notice right now. */
+  no_notice_required: number;
+  /** Active subscriptions with no billing state on file. */
+  unknown_state: number;
+  /** Rules version the cohorts were computed with. */
+  rules_version: string;
+  /** Cohorts, soonest send first. */
+  data: Array<NoticeCohort>;
+  /** What needs attention. */
+  warnings: Array<NoticeCohortWarning>;
+  next_action: NextAction;
+}
+
+/** A dry run of the notice cohorts under a schedule. Approve it to switch the site to that schedule. */
+export interface NoticePlan {
+  /** Plan id. */
+  id: string;
+  /** Always "notice_plan". */
+  object: "notice_plan";
+  /** Site id. */
+  site: string;
+  /** Live or test-mode subscribers. */
+  livemode: boolean;
+  /** simple: one send per notice inside every applicable state's window. minimum_per_state: only what each subscriber's billing state requires (unknown state: every state you sell in). */
+  schedule: "simple" | "minimum_per_state";
+  /** Active subscriptions considered. */
+  active_subscriptions: number;
+  /** Active subscriptions owed no required notice right now. */
+  no_notice_required: number;
+  /** Active subscriptions with no billing state on file. */
+  unknown_state: number;
+  /** Rules version the cohorts were computed with. */
+  rules_version: string;
+  /** Cohorts, soonest send first. */
+  data: Array<NoticeCohort>;
+  /** What needs attention. */
+  warnings: Array<NoticeCohortWarning>;
+  /** draft until approved; expired 24 hours after creation if not approved. */
+  status: "draft" | "approved" | "expired";
+  /** Created (unix seconds). */
+  created: number;
+  /** Can be approved until (unix seconds). */
+  expires_at: number;
+  /** When it was approved (unix seconds). */
+  approved_at: number | null;
+  next_action: NextAction;
+}
+
+export interface CreateNoticePlanParams {
+  /** Site (site_…). */
+  site: string;
+  /** Schedule to dry-run. Default: the site's current schedule. */
+  schedule?: "simple" | "minimum_per_state";
+}
+
+/** Whether Stripe also sends renewal or trial reminders, and what to do about it. Stripe has no API for these settings, so Checkbox asks. */
+export interface StripeEmails {
+  /** Always "stripe_emails". */
+  object: "stripe_emails";
+  /** Site id. */
+  site: string;
+  /** Whether the question was answered. */
+  answered: boolean;
+  /** The answer about Stripe's renewal email. */
+  renewal: {
+    /** Stripe sends its upcoming-renewal email. */
+    on: boolean;
+    /** Days before renewal Stripe sends it. */
+    days?: number;
+  } | null;
+  /** The answer about Stripe's trial reminder. */
+  trial: {
+    /** Stripe sends its 7-day trial reminder. */
+    on: boolean;
+  } | null;
+  /** When it was answered (unix seconds). */
+  answered_at: number | null;
+  /** What to do with Stripe's emails, from your plans (null until answered). */
+  recommendation: {
+    /** What to do with Stripe's renewal email. */
+    renewal: {
+      /** What to do with this Stripe email. */
+      verdict: "keep" | "turn_off" | "raise_days" | "not_used";
+      /** Why, in plain words. */
+      message: string;
+    };
+    /** What to do with Stripe's trial reminder. */
+    trial: {
+      /** What to do with this Stripe email. */
+      verdict: "keep" | "turn_off" | "raise_days" | "not_used";
+      /** Why, in plain words. */
+      message: string;
+    };
+  } | null;
+  next_action: NextAction;
+}
+
+export interface SetStripeEmailsParams {
+  /** Site (site_…). */
+  site: string;
+  /** Stripe Dashboard: Settings → Billing → Subscriptions and emails → upcoming renewals. */
+  renewal: {
+    /** Stripe sends its "upcoming renewal" email. */
+    on: boolean;
+    /** Stripe's "days before renewal" setting. */
+    days?: number;
+  };
+  /** Stripe's trial-ending reminder. */
+  trial: {
+    /** Stripe sends its 7-day trial reminder. */
+    on: boolean;
+  };
+}
+
 /** One changed requirement. */
 export interface LawChange {
   /** Requirement id in the legal catalog. */
@@ -5974,6 +6181,20 @@ export interface ListDueNoticesParams {
 export interface ListNoticeTemplatesParams {
   /** Site (site_…) whose BCC addresses to include. */
   site?: string;
+}
+
+/** Parameters of `noticeCohorts.list()` (listNoticeCohorts). */
+export interface ListNoticeCohortsParams {
+  /** Site (site_…). */
+  site: string;
+  /** Preview this schedule. Default: the site's current one. */
+  schedule?: "simple" | "minimum_per_state";
+}
+
+/** Parameters of `stripeEmails.retrieve()` (retrieveStripeEmails). */
+export interface RetrieveStripeEmailsParams {
+  /** Site (site_…). */
+  site: string;
 }
 
 /** Parameters of `lawUpdates.list()` (listLawUpdates). */

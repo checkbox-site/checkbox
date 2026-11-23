@@ -54,6 +54,10 @@ export const OPERATION_TOOLS: Record<string, string> = {
   markNoticeMissed: 'mark_notice_sent',
   listNoticeTemplates: 'get_notice_templates',
   checkNoticeTemplate: 'get_notice_templates',
+  listNoticeCohorts: 'get_notice_cohorts',
+  createNoticePlan: 'plan_notices',
+  retrieveNoticePlan: 'plan_notices',
+  approveNoticePlan: 'plan_notices',
 };
 
 

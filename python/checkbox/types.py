@@ -5080,6 +5080,335 @@ MarkNoticeMissedParams = TypedDict(
 )
 
 
+#: The plan these subscribers are on.
+NoticeCohortPlan = TypedDict(
+    "NoticeCohortPlan",
+    {
+        #: Product name as the billing platform reports it. (optional)
+        "product": str,
+        #: Price in the smallest currency unit. (optional)
+        "amount": int,
+        #: ISO currency code (lowercase). (optional)
+        "currency": str,
+        #: Billing interval. (optional)
+        "interval": str,
+        #: Intervals per charge. (optional)
+        "interval_count": int,
+    },
+    total=False,
+)
+
+
+NoticeCohortRequirementsItem = TypedDict(
+    "NoticeCohortRequirementsItem",
+    {
+        #: Catalog requirement id.
+        "id": str,
+        #: Jurisdiction.
+        "jurisdiction": str,
+        #: Citation.
+        "citation": str,
+        #: Requirement title. (optional)
+        "title": str,
+    },
+    total=False,
+)
+
+
+#: Where the subscriber's state came from.
+NoticeCohortStateBasis = TypedDict(
+    "NoticeCohortStateBasis",
+    {
+        #: Subscribers whose billing state decided their window.
+        "billing_state": int,
+        #: Subscribers with no billing state: every state the site sells in applies.
+        "unknown": int,
+    },
+    total=False,
+)
+
+
+#: When the notice may be sent.
+NoticeCohortWindow = TypedDict(
+    "NoticeCohortWindow",
+    {
+        #: Shortest lead, in days before the event the notice announces.
+        "min_days_before": float,
+        #: Longest lead.
+        "max_days_before": float,
+        #: The window in words.
+        "description": str,
+    },
+    total=False,
+)
+
+
+#: Subscribers owed the same notice under the same rules.
+NoticeCohort = TypedDict(
+    "NoticeCohort",
+    {
+        #: Cohort id: stable for the same notice kind, plan and requirements.
+        "id": str,
+        #: Notice kind (acknowledgment, trial_ending, renewal_reminder, annual_terms, price_change).
+        "kind": str,
+        #: Human label of the kind.
+        "label": str,
+        #: The plan these subscribers are on.
+        "plan": "NoticeCohortPlan",
+        #: Why the notice is sent: "law" (a catalog requirement makes it mandatory).
+        "required": Literal["law"],
+        #: The rules that make this notice required (not legal advice).
+        "requirements": List["NoticeCohortRequirementsItem"],
+        #: Jurisdictions the send windows satisfy.
+        "jurisdictions": List[str],
+        #: Subscribers in this cohort.
+        "subscriptions": int,
+        #: Billing-platform subscription ids (at most 500; see subscription_ids_truncated).
+        "subscription_ids": List[str],
+        #: True when subscription_ids lists only the first 500.
+        "subscription_ids_truncated": bool,
+        #: Where the subscriber's state came from.
+        "state_basis": "NoticeCohortStateBasis",
+        #: When the notice may be sent.
+        "window": "NoticeCohortWindow",
+        #: Earliest recommended send time ahead (unix seconds), or null.
+        "next_send_date": Optional[int],
+        #: Notices of this cohort due in the next 30 days.
+        "sends_next_30_days": int,
+        #: Notices whose window already closed (send now; recorded as late).
+        "late": int,
+    },
+    total=False,
+)
+
+
+NoticeCohortWarning = TypedDict(
+    "NoticeCohortWarning",
+    {
+        #: unknown_state, late_notices, stripe_may_also_send or stripe_question_unanswered.
+        "code": str,
+        #: How much it matters.
+        "severity": Literal["info", "medium", "high"],
+        #: What it means and what to do.
+        "message": str,
+        #: The cohort it is about. (optional)
+        "cohort": str,
+        #: Subscribers or notices concerned. (optional)
+        "count": int,
+        #: Share of subscribers concerned (0–1). (optional)
+        "share": float,
+    },
+    total=False,
+)
+
+
+#: Who is owed which required notice, grouped into cohorts. Every active subscription is in a cohort or counted in no_notice_required.
+NoticeCohortList = TypedDict(
+    "NoticeCohortList",
+    {
+        #: Always "notice_cohort_list".
+        "object": Literal["notice_cohort_list"],
+        #: Site id.
+        "site": str,
+        #: Live or test-mode subscribers.
+        "livemode": bool,
+        #: simple: one send per notice inside every applicable state's window. minimum_per_state: only what each subscriber's billing state requires (unknown state: every state you sell in).
+        "schedule": Literal["simple", "minimum_per_state"],
+        #: Active subscriptions considered.
+        "active_subscriptions": int,
+        #: Active subscriptions owed no required notice right now.
+        "no_notice_required": int,
+        #: Active subscriptions with no billing state on file.
+        "unknown_state": int,
+        #: Rules version the cohorts were computed with.
+        "rules_version": str,
+        #: Cohorts, soonest send first.
+        "data": List["NoticeCohort"],
+        #: What needs attention.
+        "warnings": List["NoticeCohortWarning"],
+        "next_action": "NextAction",
+    },
+    total=False,
+)
+
+
+#: A dry run of the notice cohorts under a schedule. Approve it to switch the site to that schedule.
+NoticePlan = TypedDict(
+    "NoticePlan",
+    {
+        #: Plan id.
+        "id": str,
+        #: Always "notice_plan".
+        "object": Literal["notice_plan"],
+        #: Site id.
+        "site": str,
+        #: Live or test-mode subscribers.
+        "livemode": bool,
+        #: simple: one send per notice inside every applicable state's window. minimum_per_state: only what each subscriber's billing state requires (unknown state: every state you sell in).
+        "schedule": Literal["simple", "minimum_per_state"],
+        #: Active subscriptions considered.
+        "active_subscriptions": int,
+        #: Active subscriptions owed no required notice right now.
+        "no_notice_required": int,
+        #: Active subscriptions with no billing state on file.
+        "unknown_state": int,
+        #: Rules version the cohorts were computed with.
+        "rules_version": str,
+        #: Cohorts, soonest send first.
+        "data": List["NoticeCohort"],
+        #: What needs attention.
+        "warnings": List["NoticeCohortWarning"],
+        #: draft until approved; expired 24 hours after creation if not approved.
+        "status": Literal["draft", "approved", "expired"],
+        #: Created (unix seconds).
+        "created": int,
+        #: Can be approved until (unix seconds).
+        "expires_at": int,
+        #: When it was approved (unix seconds).
+        "approved_at": Optional[int],
+        "next_action": "NextAction",
+    },
+    total=False,
+)
+
+
+CreateNoticePlanParams = TypedDict(
+    "CreateNoticePlanParams",
+    {
+        #: Site (site_…).
+        "site": str,
+        #: Schedule to dry-run. Default: the site's current schedule. (optional)
+        "schedule": Literal["simple", "minimum_per_state"],
+    },
+    total=False,
+)
+
+
+#: The answer about Stripe's renewal email.
+StripeEmailsRenewal = TypedDict(
+    "StripeEmailsRenewal",
+    {
+        #: Stripe sends its upcoming-renewal email.
+        "on": bool,
+        #: Days before renewal Stripe sends it. (optional)
+        "days": int,
+    },
+    total=False,
+)
+
+
+#: The answer about Stripe's trial reminder.
+StripeEmailsTrial = TypedDict(
+    "StripeEmailsTrial",
+    {
+        #: Stripe sends its 7-day trial reminder.
+        "on": bool,
+    },
+    total=False,
+)
+
+
+#: What to do with Stripe's renewal email.
+StripeEmailsRecommendationRenewal = TypedDict(
+    "StripeEmailsRecommendationRenewal",
+    {
+        #: What to do with this Stripe email.
+        "verdict": Literal["keep", "turn_off", "raise_days", "not_used"],
+        #: Why, in plain words.
+        "message": str,
+    },
+    total=False,
+)
+
+
+#: What to do with Stripe's trial reminder.
+StripeEmailsRecommendationTrial = TypedDict(
+    "StripeEmailsRecommendationTrial",
+    {
+        #: What to do with this Stripe email.
+        "verdict": Literal["keep", "turn_off", "raise_days", "not_used"],
+        #: Why, in plain words.
+        "message": str,
+    },
+    total=False,
+)
+
+
+#: What to do with Stripe's emails, from your plans (null until answered).
+StripeEmailsRecommendation = TypedDict(
+    "StripeEmailsRecommendation",
+    {
+        #: What to do with Stripe's renewal email.
+        "renewal": "StripeEmailsRecommendationRenewal",
+        #: What to do with Stripe's trial reminder.
+        "trial": "StripeEmailsRecommendationTrial",
+    },
+    total=False,
+)
+
+
+#: Whether Stripe also sends renewal or trial reminders, and what to do about it. Stripe has no API for these settings, so Checkbox asks.
+StripeEmails = TypedDict(
+    "StripeEmails",
+    {
+        #: Always "stripe_emails".
+        "object": Literal["stripe_emails"],
+        #: Site id.
+        "site": str,
+        #: Whether the question was answered.
+        "answered": bool,
+        #: The answer about Stripe's renewal email.
+        "renewal": Optional["StripeEmailsRenewal"],
+        #: The answer about Stripe's trial reminder.
+        "trial": Optional["StripeEmailsTrial"],
+        #: When it was answered (unix seconds).
+        "answered_at": Optional[int],
+        #: What to do with Stripe's emails, from your plans (null until answered).
+        "recommendation": Optional["StripeEmailsRecommendation"],
+        "next_action": "NextAction",
+    },
+    total=False,
+)
+
+
+#: Stripe Dashboard: Settings → Billing → Subscriptions and emails → upcoming renewals.
+SetStripeEmailsParamsRenewal = TypedDict(
+    "SetStripeEmailsParamsRenewal",
+    {
+        #: Stripe sends its "upcoming renewal" email.
+        "on": bool,
+        #: Stripe's "days before renewal" setting. (optional)
+        "days": int,
+    },
+    total=False,
+)
+
+
+#: Stripe's trial-ending reminder.
+SetStripeEmailsParamsTrial = TypedDict(
+    "SetStripeEmailsParamsTrial",
+    {
+        #: Stripe sends its 7-day trial reminder.
+        "on": bool,
+    },
+    total=False,
+)
+
+
+SetStripeEmailsParams = TypedDict(
+    "SetStripeEmailsParams",
+    {
+        #: Site (site_…).
+        "site": str,
+        #: Stripe Dashboard: Settings → Billing → Subscriptions and emails → upcoming renewals.
+        "renewal": "SetStripeEmailsParamsRenewal",
+        #: Stripe's trial-ending reminder.
+        "trial": "SetStripeEmailsParamsTrial",
+    },
+    total=False,
+)
+
+
 #: One changed requirement.
 LawChange = TypedDict(
     "LawChange",
@@ -9153,6 +9482,30 @@ ListNoticeTemplatesParams = TypedDict(
     "ListNoticeTemplatesParams",
     {
         #: Site (site_…) whose BCC addresses to include. (optional)
+        "site": str,
+    },
+    total=False,
+)
+
+
+#: Parameters of `notice_cohorts.list()` (listNoticeCohorts).
+ListNoticeCohortsParams = TypedDict(
+    "ListNoticeCohortsParams",
+    {
+        #: Site (site_…).
+        "site": str,
+        #: Preview this schedule. Default: the site's current one. (optional)
+        "schedule": Literal["simple", "minimum_per_state"],
+    },
+    total=False,
+)
+
+
+#: Parameters of `stripe_emails.retrieve()` (retrieveStripeEmails).
+RetrieveStripeEmailsParams = TypedDict(
+    "RetrieveStripeEmailsParams",
+    {
+        #: Site (site_…).
         "site": str,
     },
     total=False,

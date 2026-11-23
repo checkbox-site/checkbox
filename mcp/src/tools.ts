@@ -2933,6 +2933,91 @@ const getNoticeTemplates: ToolDef = {
   },
 };
 
+// Required Notices, step 1: cohorts, dry-run plans, approval, and the Stripe built-in email question.
+interface NoticeCohortLite {
+  id: string;
+  label: string;
+  plan: { product?: string; amount?: number; currency?: string; interval?: string };
+  subscriptions: number;
+  jurisdictions: string[];
+  window: { description: string };
+  next_send_date: number | null;
+  late: number;
+  state_basis: { billing_state: number; unknown: number };
+  requirements: Array<{ citation: string }>;
+}
+interface NoticeCohortReportLite {
+  id?: string;
+  status?: string;
+  schedule: string;
+  active_subscriptions: number;
+  no_notice_required: number;
+  unknown_state: number;
+  data: NoticeCohortLite[];
+  warnings: Array<{ code: string; severity: string; message: string }>;
+  next_action?: { type: string; message: string; operation_id?: string };
+}
+
+function cohortLine(c: NoticeCohortLite): string {
+  const price = c.plan.amount !== undefined ? ` ${(c.plan.amount / 100).toFixed(2)} ${(c.plan.currency ?? '').toUpperCase()}/${c.plan.interval ?? '?'}` : '';
+  const next = c.next_send_date ? `, next send ${new Date(c.next_send_date * 1000).toISOString().slice(0, 10)}` : '';
+  const unknown = c.state_basis.unknown ? `, ${c.state_basis.unknown} with no billing state` : '';
+  const late = c.late ? `, ${c.late} LATE` : '';
+  return `${c.id} ${c.label} · ${c.plan.product ?? 'plan'}${price} · ${c.subscriptions} subscriber(s) · ${c.window.description} · ${c.jurisdictions.join(', ') || 'federal'}${next}${unknown}${late} (${c.requirements.map((r) => r.citation).join('; ')})`;
+}
+
+function cohortResult(r: NoticeCohortReportLite, prefix: string) {
+  return {
+    headline: `${prefix}${r.data.length} cohort(s) under the ${r.schedule.replace(/_/g, ' ')} schedule; ${r.active_subscriptions} active subscription(s), ${r.no_notice_required} owed nothing now, ${r.unknown_state} with no billing state.`,
+    notes: [...r.data.map(cohortLine), ...r.warnings.map((w) => `${w.severity.toUpperCase()}: ${w.message}`)],
+    data: r,
+    ...(r.next_action ? { next: r.next_action } : {}),
+  };
+}
+
+const scheduleArg = z.enum(['simple', 'minimum_per_state']);
+
+const getNoticeCohorts: ToolDef = {
+  name: 'get_notice_cohorts',
+  title: 'Who is owed which required notice',
+  description:
+    'Active subscriptions grouped by the legally required notice each is owed (notice × plan × rule): send window, next send date, state basis. Totals add up. schedule previews simple or minimum_per_state. Not legal advice.',
+  input: {
+    site: z.string().max(100).describe('Site (site_…).'),
+    schedule: scheduleArg.optional().describe('Preview this schedule.'),
+  },
+  scopes: ['notices:read'],
+  annotations: { ...ro, title: 'Notice cohorts' },
+  async run(args, { api }) {
+    const r = await api.request<NoticeCohortReportLite>('GET', '/v1/notices/cohorts', { query: pick(args, ['site', 'schedule']) as Record<string, string> });
+    return cohortResult(r, '');
+  },
+};
+
+const planNotices: ToolDef = {
+  name: 'plan_notices',
+  title: 'Dry-run or approve a notice plan',
+  description:
+    'With site: dry-runs the cohorts under a schedule as a plan (ntcp_…, approvable 24 h). With plan: re-reads it; add approve: true to approve it (switches the site to its schedule; refused if subscribers or rules changed: dry-run again). Approve only after the merchant saw the cohorts.',
+  input: {
+    site: z.string().max(100).optional().describe('Site (site_…) to dry-run.'),
+    schedule: scheduleArg.optional().describe('Schedule (default: current).'),
+    plan: z.string().max(100).optional().describe('Plan id (ntcp_…).'),
+    approve: z.boolean().optional().describe('With plan: approve it.'),
+  },
+  scopes: ['notices:write'],
+  annotations: { ...write(false), title: 'Plan notices' },
+  async run(args, { api }) {
+    const id = args.plan ? enc(String(args.plan)) : '';
+    const r = !id
+      ? await api.request<NoticeCohortReportLite>('POST', '/v1/notices/plans', { body: pick(args, ['site', 'schedule']) })
+      : args.approve === true
+        ? await api.request<NoticeCohortReportLite>('POST', `/v1/notices/plans/${id}/approve`)
+        : await api.request<NoticeCohortReportLite>('GET', `/v1/notices/plans/${id}`);
+    return cohortResult(r, `${r.id} (${r.status}): `);
+  },
+};
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Escape hatch
 // ---------------------------------------------------------------------------------------------------------------------
@@ -3112,6 +3197,8 @@ export const TOOLS: readonly ToolDef[] = [
   listDueNotices,
   markNoticeSent,
   getNoticeTemplates,
+  getNoticeCohorts,
+  planNotices,
   sendFeedback,
   callApi,
 ];
@@ -3154,6 +3241,8 @@ export const TOOL_OPERATIONS: Record<string, string[]> = {
   list_due_notices: ['listDueNotices'],
   mark_notice_sent: ['markNoticeSent', 'markNoticeMissed'],
   get_notice_templates: ['listNoticeTemplates', 'checkNoticeTemplate'],
+  get_notice_cohorts: ['listNoticeCohorts'],
+  plan_notices: ['createNoticePlan', 'retrieveNoticePlan', 'approveNoticePlan'],
   send_feedback: ['createFeedback'],
   call_api: [],
 };

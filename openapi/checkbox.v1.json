@@ -15036,6 +15036,893 @@
           }
         }
       },
+      "NoticeCohort": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Cohort id: stable for the same notice kind, plan and requirements.",
+            "example": "coh_3f9a1c2e7b4d"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Notice kind (acknowledgment, trial_ending, renewal_reminder, annual_terms, price_change).",
+            "example": "renewal_reminder"
+          },
+          "label": {
+            "type": "string",
+            "description": "Human label of the kind.",
+            "example": "Renewal reminder"
+          },
+          "plan": {
+            "type": "object",
+            "properties": {
+              "product": {
+                "type": "string",
+                "description": "Product name as the billing platform reports it.",
+                "example": "Pro"
+              },
+              "amount": {
+                "type": "integer",
+                "description": "Price in the smallest currency unit.",
+                "example": 19900
+              },
+              "currency": {
+                "type": "string",
+                "description": "ISO currency code (lowercase).",
+                "example": "usd"
+              },
+              "interval": {
+                "type": "string",
+                "description": "Billing interval.",
+                "example": "year"
+              },
+              "interval_count": {
+                "type": "integer",
+                "description": "Intervals per charge.",
+                "example": 1
+              }
+            },
+            "description": "The plan these subscribers are on.",
+            "example": {
+              "product": "Pro",
+              "amount": 19900,
+              "currency": "usd",
+              "interval": "year",
+              "interval_count": 1
+            }
+          },
+          "required": {
+            "type": "string",
+            "enum": [
+              "law"
+            ],
+            "description": "Why the notice is sent: \"law\" (a catalog requirement makes it mandatory).",
+            "example": "law"
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Catalog requirement id.",
+                  "example": "US-CA.17602.b.2"
+                },
+                "jurisdiction": {
+                  "type": "string",
+                  "description": "Jurisdiction.",
+                  "example": "US-CA"
+                },
+                "citation": {
+                  "type": "string",
+                  "description": "Citation.",
+                  "example": "Cal. Bus. & Prof. Code § 17602(a)(8), (b)(2)"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Requirement title.",
+                  "example": "Renewal notice before a term of a year or more renews"
+                }
+              },
+              "required": [
+                "id",
+                "jurisdiction",
+                "citation"
+              ]
+            },
+            "description": "The rules that make this notice required (not legal advice).",
+            "example": [
+              {
+                "id": "US-CA.17602.b.2",
+                "jurisdiction": "US-CA",
+                "citation": "Cal. Bus. & Prof. Code § 17602(a)(8), (b)(2)",
+                "title": "Renewal notice before a term of a year or more renews"
+              }
+            ]
+          },
+          "jurisdictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Jurisdictions the send windows satisfy.",
+            "example": [
+              "US-CA",
+              "US-NY"
+            ]
+          },
+          "subscriptions": {
+            "type": "integer",
+            "description": "Subscribers in this cohort.",
+            "example": 212
+          },
+          "subscription_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Billing-platform subscription ids (at most 500; see subscription_ids_truncated).",
+            "example": [
+              "sub_1QabcXYZ"
+            ]
+          },
+          "subscription_ids_truncated": {
+            "type": "boolean",
+            "description": "True when subscription_ids lists only the first 500.",
+            "example": false
+          },
+          "state_basis": {
+            "type": "object",
+            "properties": {
+              "billing_state": {
+                "type": "integer",
+                "description": "Subscribers whose billing state decided their window.",
+                "example": 151
+              },
+              "unknown": {
+                "type": "integer",
+                "description": "Subscribers with no billing state: every state the site sells in applies.",
+                "example": 61
+              }
+            },
+            "required": [
+              "billing_state",
+              "unknown"
+            ],
+            "description": "Where the subscriber's state came from.",
+            "example": {
+              "billing_state": 151,
+              "unknown": 61
+            }
+          },
+          "window": {
+            "type": "object",
+            "properties": {
+              "min_days_before": {
+                "type": "number",
+                "description": "Shortest lead, in days before the event the notice announces.",
+                "example": 15
+              },
+              "max_days_before": {
+                "type": "number",
+                "description": "Longest lead.",
+                "example": 45
+              },
+              "description": {
+                "type": "string",
+                "description": "The window in words.",
+                "example": "15–45 days before renewal"
+              }
+            },
+            "required": [
+              "min_days_before",
+              "max_days_before",
+              "description"
+            ],
+            "description": "When the notice may be sent.",
+            "example": {
+              "min_days_before": 15,
+              "max_days_before": 45,
+              "description": "15–45 days before renewal"
+            }
+          },
+          "next_send_date": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Earliest recommended send time ahead (unix seconds), or null.",
+            "example": 1795996800
+          },
+          "sends_next_30_days": {
+            "type": "integer",
+            "description": "Notices of this cohort due in the next 30 days.",
+            "example": 18
+          },
+          "late": {
+            "type": "integer",
+            "description": "Notices whose window already closed (send now; recorded as late).",
+            "example": 0
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "plan",
+          "required",
+          "requirements",
+          "jurisdictions",
+          "subscriptions",
+          "subscription_ids",
+          "subscription_ids_truncated",
+          "state_basis",
+          "window",
+          "next_send_date",
+          "sends_next_30_days",
+          "late"
+        ],
+        "description": "Subscribers owed the same notice under the same rules."
+      },
+      "NoticeCohortWarning": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "unknown_state, late_notices, stripe_may_also_send or stripe_question_unanswered.",
+            "example": "unknown_state"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "medium",
+              "high"
+            ],
+            "description": "How much it matters.",
+            "example": "info"
+          },
+          "message": {
+            "type": "string",
+            "description": "What it means and what to do.",
+            "example": "61 of 212 subscribers have no billing state on file."
+          },
+          "cohort": {
+            "type": "string",
+            "description": "The cohort it is about.",
+            "example": "coh_3f9a1c2e7b4d"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Subscribers or notices concerned.",
+            "example": 61
+          },
+          "share": {
+            "type": "number",
+            "description": "Share of subscribers concerned (0–1).",
+            "example": 0.288
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ]
+      },
+      "NoticeCohortList": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "enum": [
+              "notice_cohort_list"
+            ],
+            "description": "Always \"notice_cohort_list\".",
+            "example": "notice_cohort_list"
+          },
+          "site": {
+            "type": "string",
+            "description": "Site id.",
+            "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "livemode": {
+            "type": "boolean",
+            "description": "Live or test-mode subscribers.",
+            "example": true
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "simple",
+              "minimum_per_state"
+            ],
+            "description": "simple: one send per notice inside every applicable state's window. minimum_per_state: only what each subscriber's billing state requires (unknown state: every state you sell in).",
+            "example": "simple"
+          },
+          "active_subscriptions": {
+            "type": "integer",
+            "description": "Active subscriptions considered.",
+            "example": 640
+          },
+          "no_notice_required": {
+            "type": "integer",
+            "description": "Active subscriptions owed no required notice right now.",
+            "example": 402
+          },
+          "unknown_state": {
+            "type": "integer",
+            "description": "Active subscriptions with no billing state on file.",
+            "example": 61
+          },
+          "rules_version": {
+            "type": "string",
+            "description": "Rules version the cohorts were computed with.",
+            "example": "1.4.0"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeCohort"
+            },
+            "description": "Cohorts, soonest send first.",
+            "example": [
+              {
+                "id": "coh_3f9a1c2e7b4d",
+                "kind": "renewal_reminder",
+                "label": "Renewal reminder",
+                "plan": {
+                  "product": "Pro",
+                  "amount": 19900,
+                  "currency": "usd",
+                  "interval": "year",
+                  "interval_count": 1
+                },
+                "required": "law",
+                "requirements": [
+                  {
+                    "id": "US-CA.17602.b.2",
+                    "jurisdiction": "US-CA",
+                    "citation": "Cal. Bus. & Prof. Code § 17602(a)(8), (b)(2)",
+                    "title": "Renewal notice before a term of a year or more renews"
+                  }
+                ],
+                "jurisdictions": [
+                  "US-CA",
+                  "US-NY"
+                ],
+                "subscriptions": 212,
+                "subscription_ids": [
+                  "sub_1QabcXYZ"
+                ],
+                "subscription_ids_truncated": false,
+                "state_basis": {
+                  "billing_state": 151,
+                  "unknown": 61
+                },
+                "window": {
+                  "min_days_before": 15,
+                  "max_days_before": 45,
+                  "description": "15–45 days before renewal"
+                },
+                "next_send_date": 1795996800,
+                "sends_next_30_days": 18,
+                "late": 0
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeCohortWarning"
+            },
+            "description": "What needs attention.",
+            "example": [
+              {
+                "code": "unknown_state",
+                "severity": "info",
+                "message": "61 of 212 subscribers have no billing state on file.",
+                "cohort": "coh_3f9a1c2e7b4d",
+                "count": 61,
+                "share": 0.288
+              }
+            ]
+          },
+          "next_action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NextAction"
+              },
+              {
+                "description": "What to do next."
+              }
+            ],
+            "example": {
+              "type": "verify_domain",
+              "message": "Verify your site domain to turn on live mode.",
+              "operation_id": "createDomainVerification",
+              "mcp_tool": "call_api",
+              "endpoint": "POST /v1/sites/{site}/domain_verification",
+              "url": "https://checkbox.site/docs/concepts/activation#verify"
+            }
+          }
+        },
+        "required": [
+          "object",
+          "site",
+          "livemode",
+          "schedule",
+          "active_subscriptions",
+          "no_notice_required",
+          "unknown_state",
+          "rules_version",
+          "data",
+          "warnings",
+          "next_action"
+        ],
+        "description": "Who is owed which required notice, grouped into cohorts. Every active subscription is in a cohort or counted in no_notice_required."
+      },
+      "NoticePlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Plan id.",
+            "example": "ntcp_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "object": {
+            "type": "string",
+            "enum": [
+              "notice_plan"
+            ],
+            "description": "Always \"notice_plan\".",
+            "example": "notice_plan"
+          },
+          "site": {
+            "type": "string",
+            "description": "Site id.",
+            "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "livemode": {
+            "type": "boolean",
+            "description": "Live or test-mode subscribers.",
+            "example": true
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "simple",
+              "minimum_per_state"
+            ],
+            "description": "simple: one send per notice inside every applicable state's window. minimum_per_state: only what each subscriber's billing state requires (unknown state: every state you sell in).",
+            "example": "simple"
+          },
+          "active_subscriptions": {
+            "type": "integer",
+            "description": "Active subscriptions considered.",
+            "example": 640
+          },
+          "no_notice_required": {
+            "type": "integer",
+            "description": "Active subscriptions owed no required notice right now.",
+            "example": 402
+          },
+          "unknown_state": {
+            "type": "integer",
+            "description": "Active subscriptions with no billing state on file.",
+            "example": 61
+          },
+          "rules_version": {
+            "type": "string",
+            "description": "Rules version the cohorts were computed with.",
+            "example": "1.4.0"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeCohort"
+            },
+            "description": "Cohorts, soonest send first.",
+            "example": [
+              {
+                "id": "coh_3f9a1c2e7b4d",
+                "kind": "renewal_reminder",
+                "label": "Renewal reminder",
+                "plan": {
+                  "product": "Pro",
+                  "amount": 19900,
+                  "currency": "usd",
+                  "interval": "year",
+                  "interval_count": 1
+                },
+                "required": "law",
+                "requirements": [
+                  {
+                    "id": "US-CA.17602.b.2",
+                    "jurisdiction": "US-CA",
+                    "citation": "Cal. Bus. & Prof. Code § 17602(a)(8), (b)(2)",
+                    "title": "Renewal notice before a term of a year or more renews"
+                  }
+                ],
+                "jurisdictions": [
+                  "US-CA",
+                  "US-NY"
+                ],
+                "subscriptions": 212,
+                "subscription_ids": [
+                  "sub_1QabcXYZ"
+                ],
+                "subscription_ids_truncated": false,
+                "state_basis": {
+                  "billing_state": 151,
+                  "unknown": 61
+                },
+                "window": {
+                  "min_days_before": 15,
+                  "max_days_before": 45,
+                  "description": "15–45 days before renewal"
+                },
+                "next_send_date": 1795996800,
+                "sends_next_30_days": 18,
+                "late": 0
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeCohortWarning"
+            },
+            "description": "What needs attention.",
+            "example": [
+              {
+                "code": "unknown_state",
+                "severity": "info",
+                "message": "61 of 212 subscribers have no billing state on file.",
+                "cohort": "coh_3f9a1c2e7b4d",
+                "count": 61,
+                "share": 0.288
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "expired"
+            ],
+            "description": "draft until approved; expired 24 hours after creation if not approved.",
+            "example": "draft"
+          },
+          "created": {
+            "type": "integer",
+            "description": "Created (unix seconds).",
+            "example": 1795392000
+          },
+          "expires_at": {
+            "type": "integer",
+            "description": "Can be approved until (unix seconds).",
+            "example": 1795478400
+          },
+          "approved_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "When it was approved (unix seconds).",
+            "example": null
+          },
+          "next_action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NextAction"
+              },
+              {
+                "description": "What to do next."
+              }
+            ],
+            "example": {
+              "type": "verify_domain",
+              "message": "Verify your site domain to turn on live mode.",
+              "operation_id": "createDomainVerification",
+              "mcp_tool": "call_api",
+              "endpoint": "POST /v1/sites/{site}/domain_verification",
+              "url": "https://checkbox.site/docs/concepts/activation#verify"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "site",
+          "livemode",
+          "schedule",
+          "active_subscriptions",
+          "no_notice_required",
+          "unknown_state",
+          "rules_version",
+          "data",
+          "warnings",
+          "status",
+          "created",
+          "expires_at",
+          "approved_at",
+          "next_action"
+        ],
+        "description": "A dry run of the notice cohorts under a schedule. Approve it to switch the site to that schedule."
+      },
+      "CreateNoticePlanParams": {
+        "type": "object",
+        "properties": {
+          "site": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Site (site_…).",
+            "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "simple",
+              "minimum_per_state"
+            ],
+            "description": "Schedule to dry-run. Default: the site's current schedule.",
+            "example": "minimum_per_state"
+          }
+        },
+        "required": [
+          "site"
+        ]
+      },
+      "StripeEmails": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "enum": [
+              "stripe_emails"
+            ],
+            "description": "Always \"stripe_emails\".",
+            "example": "stripe_emails"
+          },
+          "site": {
+            "type": "string",
+            "description": "Site id.",
+            "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "answered": {
+            "type": "boolean",
+            "description": "Whether the question was answered.",
+            "example": true
+          },
+          "renewal": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "on": {
+                "type": "boolean",
+                "description": "Stripe sends its upcoming-renewal email.",
+                "example": true
+              },
+              "days": {
+                "type": "integer",
+                "description": "Days before renewal Stripe sends it.",
+                "example": 7
+              }
+            },
+            "required": [
+              "on"
+            ],
+            "description": "The answer about Stripe's renewal email.",
+            "example": {
+              "on": true,
+              "days": 7
+            }
+          },
+          "trial": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "on": {
+                "type": "boolean",
+                "description": "Stripe sends its 7-day trial reminder.",
+                "example": true
+              }
+            },
+            "required": [
+              "on"
+            ],
+            "description": "The answer about Stripe's trial reminder.",
+            "example": {
+              "on": true
+            }
+          },
+          "answered_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "When it was answered (unix seconds).",
+            "example": 1795392000
+          },
+          "recommendation": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "renewal": {
+                "type": "object",
+                "properties": {
+                  "verdict": {
+                    "type": "string",
+                    "enum": [
+                      "keep",
+                      "turn_off",
+                      "raise_days",
+                      "not_used"
+                    ],
+                    "description": "What to do with this Stripe email.",
+                    "example": "turn_off"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Why, in plain words.",
+                    "example": "You sell monthly and annual plans; Stripe's one renewal setting cannot fit both."
+                  }
+                },
+                "required": [
+                  "verdict",
+                  "message"
+                ],
+                "description": "What to do with Stripe's renewal email.",
+                "example": {
+                  "verdict": "turn_off",
+                  "message": "You sell monthly and annual plans; Stripe's one renewal setting cannot fit both."
+                }
+              },
+              "trial": {
+                "type": "object",
+                "properties": {
+                  "verdict": {
+                    "type": "string",
+                    "enum": [
+                      "keep",
+                      "turn_off",
+                      "raise_days",
+                      "not_used"
+                    ],
+                    "description": "What to do with this Stripe email.",
+                    "example": "turn_off"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Why, in plain words.",
+                    "example": "You sell monthly and annual plans; Stripe's one renewal setting cannot fit both."
+                  }
+                },
+                "required": [
+                  "verdict",
+                  "message"
+                ],
+                "description": "What to do with Stripe's trial reminder.",
+                "example": {
+                  "verdict": "turn_off",
+                  "message": "You sell monthly and annual plans; Stripe's one renewal setting cannot fit both."
+                }
+              }
+            },
+            "required": [
+              "renewal",
+              "trial"
+            ],
+            "description": "What to do with Stripe's emails, from your plans (null until answered).",
+            "example": {
+              "renewal": {
+                "verdict": "turn_off",
+                "message": "You sell monthly and annual plans; Stripe's one renewal setting cannot fit both."
+              },
+              "trial": {
+                "verdict": "turn_off",
+                "message": "You sell monthly and annual plans; Stripe's one renewal setting cannot fit both."
+              }
+            }
+          },
+          "next_action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NextAction"
+              },
+              {
+                "description": "What to do next."
+              }
+            ],
+            "example": {
+              "type": "verify_domain",
+              "message": "Verify your site domain to turn on live mode.",
+              "operation_id": "createDomainVerification",
+              "mcp_tool": "call_api",
+              "endpoint": "POST /v1/sites/{site}/domain_verification",
+              "url": "https://checkbox.site/docs/concepts/activation#verify"
+            }
+          }
+        },
+        "required": [
+          "object",
+          "site",
+          "answered",
+          "renewal",
+          "trial",
+          "answered_at",
+          "recommendation",
+          "next_action"
+        ],
+        "description": "Whether Stripe also sends renewal or trial reminders, and what to do about it. Stripe has no API for these settings, so Checkbox asks."
+      },
+      "SetStripeEmailsParams": {
+        "type": "object",
+        "properties": {
+          "site": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Site (site_…).",
+            "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "renewal": {
+            "type": "object",
+            "properties": {
+              "on": {
+                "type": "boolean",
+                "description": "Stripe sends its \"upcoming renewal\" email.",
+                "example": true
+              },
+              "days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 90,
+                "description": "Stripe's \"days before renewal\" setting.",
+                "example": 7
+              }
+            },
+            "required": [
+              "on"
+            ],
+            "description": "Stripe Dashboard: Settings → Billing → Subscriptions and emails → upcoming renewals.",
+            "example": {
+              "on": true,
+              "days": 7
+            }
+          },
+          "trial": {
+            "type": "object",
+            "properties": {
+              "on": {
+                "type": "boolean",
+                "description": "Stripe sends its 7-day trial reminder.",
+                "example": true
+              }
+            },
+            "required": [
+              "on"
+            ],
+            "description": "Stripe's trial-ending reminder.",
+            "example": {
+              "on": true
+            }
+          }
+        },
+        "required": [
+          "site",
+          "renewal",
+          "trial"
+        ]
+      },
       "LawChange": {
         "type": "object",
         "properties": {
@@ -32455,6 +33342,482 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DueNotice"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notices/cohorts": {
+      "get": {
+        "operationId": "listNoticeCohorts",
+        "summary": "List notice cohorts",
+        "description": "Every active subscription of the site grouped by the required notice it is owed: notice kind × plan × the rules that require it, with the send window, the next send date, the subscribers (billing-platform ids) and where their state came from. Subscriptions owed nothing right now are counted in no_notice_required, so the totals add up. Live keys see live subscribers, test keys test-mode ones. Pass schedule= to preview the other schedule without saving.",
+        "tags": [
+          "Notices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-checkbox-scope": "notices:read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Site (site_…).",
+              "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+            },
+            "required": true,
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "simple",
+                "minimum_per_state"
+              ],
+              "description": "Preview this schedule. Default: the site's current one.",
+              "example": "simple"
+            },
+            "required": false,
+            "name": "schedule",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "API version (date). Defaults to the version your account is pinned to. Known: 2026-10-30.",
+              "example": "2026-10-30"
+            },
+            "required": false,
+            "name": "Checkbox-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeCohortList"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notices/plans": {
+      "post": {
+        "operationId": "createNoticePlan",
+        "summary": "Create a notice plan (dry run)",
+        "description": "Computes the notice cohorts under a schedule and stores them as a plan you can approve for 24 hours. Nothing changes until you approve it with approveNoticePlan. Approval is refused if the subscribers, their terms, your states or the rules changed since this dry run.",
+        "tags": [
+          "Notices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-checkbox-scope": "notices:write",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "API version (date). Defaults to the version your account is pinned to. Known: 2026-10-30.",
+              "example": "2026-10-30"
+            },
+            "required": false,
+            "name": "Checkbox-Version",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNoticePlanParams"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticePlan"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notices/plans/{plan}": {
+      "get": {
+        "operationId": "retrieveNoticePlan",
+        "summary": "Retrieve a notice plan",
+        "description": "A dry run of the notice cohorts, with its status (draft, approved or expired).",
+        "tags": [
+          "Notices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-checkbox-scope": "notices:read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Unique identifier of the notice plan (ntcp_…).",
+              "example": "ntcp_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+            },
+            "required": true,
+            "name": "plan",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "API version (date). Defaults to the version your account is pinned to. Known: 2026-10-30.",
+              "example": "2026-10-30"
+            },
+            "required": false,
+            "name": "Checkbox-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticePlan"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notices/plans/{plan}/approve": {
+      "post": {
+        "operationId": "approveNoticePlan",
+        "summary": "Approve a notice plan",
+        "description": "Approves a dry run and switches the site to its schedule. Refused (409) when the plan expired or when the subscribers, their terms, your states or the rules changed since the dry run: run createNoticePlan again and approve the new plan. Idempotent.",
+        "tags": [
+          "Notices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-checkbox-scope": "notices:write",
+        "x-checkbox-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Unique identifier of the notice plan (ntcp_…).",
+              "example": "ntcp_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+            },
+            "required": true,
+            "name": "plan",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "API version (date). Defaults to the version your account is pinned to. Known: 2026-10-30.",
+              "example": "2026-10-30"
+            },
+            "required": false,
+            "name": "Checkbox-Version",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the POST safe to retry: the same key and body within 24 hours return the stored response.",
+              "example": "7f8c3b0e-setup-site-1"
+            },
+            "required": false,
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticePlan"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notices/stripe-emails": {
+      "get": {
+        "operationId": "retrieveStripeEmails",
+        "summary": "Retrieve the Stripe email answer",
+        "description": "Whether Stripe's own renewal and trial emails are on (as you told Checkbox), and what to do with them given your plans.",
+        "tags": [
+          "Notices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-checkbox-scope": "notices:read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Site (site_…).",
+              "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+            },
+            "required": true,
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "API version (date). Defaults to the version your account is pinned to. Known: 2026-10-30.",
+              "example": "2026-10-30"
+            },
+            "required": false,
+            "name": "Checkbox-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeEmails"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "setStripeEmails",
+        "summary": "Set the Stripe email answer",
+        "description": "Tells Checkbox whether Stripe sends its \"upcoming renewal\" email (and how many days before renewal) and its 7-day trial reminder. Stripe has no API for these settings. Returns what to do with each: one Stripe setting cannot fit monthly and annual plans at once, and a lead under 15 days is too late for California and New York annual renewals.",
+        "tags": [
+          "Notices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-checkbox-scope": "notices:write",
+        "x-checkbox-idempotent": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "API version (date). Defaults to the version your account is pinned to. Known: 2026-10-30.",
+              "example": "2026-10-30"
+            },
+            "required": false,
+            "name": "Checkbox-Version",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the POST safe to retry: the same key and body within 24 hours return the stored response.",
+              "example": "7f8c3b0e-setup-site-1"
+            },
+            "required": false,
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStripeEmailsParams"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeEmails"
                 }
               }
             }

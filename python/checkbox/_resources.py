@@ -1064,6 +1064,108 @@ OPERATIONS: Dict[str, Dict[str, Any]] = {
         "paginated": False,
         "summary": "Record a due notice as missed",
     },
+    "listNoticeCohorts": {
+        "operation_id": "listNoticeCohorts",
+        "namespace": "notice_cohorts",
+        "method": "list",
+        "http_method": "GET",
+        "path": "/v1/notices/cohorts",
+        "path_params": (),
+        "query_params": ("site", "schedule", ),
+        "body": False,
+        "idempotent": False,
+        "auth": True,
+        "scope": "notices:read",
+        "response": "json",
+        "list": False,
+        "paginated": False,
+        "summary": "List notice cohorts",
+    },
+    "createNoticePlan": {
+        "operation_id": "createNoticePlan",
+        "namespace": "notice_plans",
+        "method": "create",
+        "http_method": "POST",
+        "path": "/v1/notices/plans",
+        "path_params": (),
+        "query_params": (),
+        "body": True,
+        "idempotent": False,
+        "auth": True,
+        "scope": "notices:write",
+        "response": "json",
+        "list": False,
+        "paginated": False,
+        "summary": "Create a notice plan (dry run)",
+    },
+    "retrieveNoticePlan": {
+        "operation_id": "retrieveNoticePlan",
+        "namespace": "notice_plans",
+        "method": "retrieve",
+        "http_method": "GET",
+        "path": "/v1/notices/plans/{plan}",
+        "path_params": ("plan", ),
+        "query_params": (),
+        "body": False,
+        "idempotent": False,
+        "auth": True,
+        "scope": "notices:read",
+        "response": "json",
+        "list": False,
+        "paginated": False,
+        "summary": "Retrieve a notice plan",
+    },
+    "approveNoticePlan": {
+        "operation_id": "approveNoticePlan",
+        "namespace": "notice_plans",
+        "method": "approve",
+        "http_method": "POST",
+        "path": "/v1/notices/plans/{plan}/approve",
+        "path_params": ("plan", ),
+        "query_params": (),
+        "body": False,
+        "idempotent": True,
+        "auth": True,
+        "scope": "notices:write",
+        "response": "json",
+        "list": False,
+        "paginated": False,
+        "summary": "Approve a notice plan",
+    },
+    "retrieveStripeEmails": {
+        "operation_id": "retrieveStripeEmails",
+        "namespace": "stripe_emails",
+        "method": "retrieve",
+        "http_method": "GET",
+        "path": "/v1/notices/stripe-emails",
+        "path_params": (),
+        "query_params": ("site", ),
+        "body": False,
+        "idempotent": False,
+        "auth": True,
+        "scope": "notices:read",
+        "response": "json",
+        "list": False,
+        "paginated": False,
+        "summary": "Retrieve the Stripe email answer",
+    },
+    "setStripeEmails": {
+        "operation_id": "setStripeEmails",
+        "namespace": "stripe_emails",
+        "method": "set",
+        "http_method": "POST",
+        "path": "/v1/notices/stripe-emails",
+        "path_params": (),
+        "query_params": (),
+        "body": True,
+        "idempotent": True,
+        "auth": True,
+        "scope": "notices:write",
+        "response": "json",
+        "list": False,
+        "paginated": False,
+        "summary": "Set the Stripe email answer",
+    },
     "listLawUpdates": {
         "operation_id": "listLawUpdates",
         "namespace": "law_updates",
@@ -2688,6 +2790,80 @@ class NoticesResource(Resource):
         return self._call("markNoticeMissed", (notice, ), params, kwargs, request_options)  # type: ignore[no-any-return]
 
 
+class NoticeCohortsResource(Resource):
+    """``checkbox.notice_cohorts``"""
+
+    def list(self, params: Optional["types.ListNoticeCohortsParams"] = None, /, *, request_options: Optional[RequestOptions] = None, **kwargs: Any) -> "types.NoticeCohortList":
+        """List notice cohorts.
+
+        Every active subscription of the site grouped by the required notice it is owed: notice kind × plan × the rules that require it, with the send window, the next send date, the subscribers (billing-platform ids) and where their state came from. Subscriptions owed nothing right now are counted in no_notice_required, so the totals add up. Live keys see live subscribers, test keys test-mode ones. Pass schedule= to preview the other schedule without saving.
+
+        Parameters can be given as a dict (positional) or as keyword arguments.
+
+        ``GET /v1/notices/cohorts`` (operation ``listNoticeCohorts``, scope ``notices:read``).
+        """
+        return self._call("listNoticeCohorts", (), params, kwargs, request_options)  # type: ignore[no-any-return]
+
+
+class NoticePlansResource(Resource):
+    """``checkbox.notice_plans``"""
+
+    def create(self, params: Optional["types.CreateNoticePlanParams"] = None, /, *, request_options: Optional[RequestOptions] = None, **kwargs: Any) -> "types.NoticePlan":
+        """Create a notice plan (dry run).
+
+        Computes the notice cohorts under a schedule and stores them as a plan you can approve for 24 hours. Nothing changes until you approve it with approveNoticePlan. Approval is refused if the subscribers, their terms, your states or the rules changed since this dry run.
+
+        Parameters can be given as a dict (positional) or as keyword arguments.
+
+        ``POST /v1/notices/plans`` (operation ``createNoticePlan``, scope ``notices:write``).
+        """
+        return self._call("createNoticePlan", (), params, kwargs, request_options)  # type: ignore[no-any-return]
+
+    def retrieve(self, plan: str, /, *, request_options: Optional[RequestOptions] = None) -> "types.NoticePlan":
+        """Retrieve a notice plan.
+
+        A dry run of the notice cohorts, with its status (draft, approved or expired).
+
+        ``GET /v1/notices/plans/{plan}`` (operation ``retrieveNoticePlan``, scope ``notices:read``).
+        """
+        return self._call("retrieveNoticePlan", (plan, ), None, None, request_options)  # type: ignore[no-any-return]
+
+    def approve(self, plan: str, /, *, request_options: Optional[RequestOptions] = None) -> "types.NoticePlan":
+        """Approve a notice plan.
+
+        Approves a dry run and switches the site to its schedule. Refused (409) when the plan expired or when the subscribers, their terms, your states or the rules changed since the dry run: run createNoticePlan again and approve the new plan. Idempotent.
+
+        ``POST /v1/notices/plans/{plan}/approve`` (operation ``approveNoticePlan``, scope ``notices:write``).
+        """
+        return self._call("approveNoticePlan", (plan, ), None, None, request_options)  # type: ignore[no-any-return]
+
+
+class StripeEmailsResource(Resource):
+    """``checkbox.stripe_emails``"""
+
+    def retrieve(self, params: Optional["types.RetrieveStripeEmailsParams"] = None, /, *, request_options: Optional[RequestOptions] = None, **kwargs: Any) -> "types.StripeEmails":
+        """Retrieve the Stripe email answer.
+
+        Whether Stripe's own renewal and trial emails are on (as you told Checkbox), and what to do with them given your plans.
+
+        Parameters can be given as a dict (positional) or as keyword arguments.
+
+        ``GET /v1/notices/stripe-emails`` (operation ``retrieveStripeEmails``, scope ``notices:read``).
+        """
+        return self._call("retrieveStripeEmails", (), params, kwargs, request_options)  # type: ignore[no-any-return]
+
+    def set(self, params: Optional["types.SetStripeEmailsParams"] = None, /, *, request_options: Optional[RequestOptions] = None, **kwargs: Any) -> "types.StripeEmails":
+        """Set the Stripe email answer.
+
+        Tells Checkbox whether Stripe sends its "upcoming renewal" email (and how many days before renewal) and its 7-day trial reminder. Stripe has no API for these settings. Returns what to do with each: one Stripe setting cannot fit monthly and annual plans at once, and a lead under 15 days is too late for California and New York annual renewals.
+
+        Parameters can be given as a dict (positional) or as keyword arguments.
+
+        ``POST /v1/notices/stripe-emails`` (operation ``setStripeEmails``, scope ``notices:write``).
+        """
+        return self._call("setStripeEmails", (), params, kwargs, request_options)  # type: ignore[no-any-return]
+
+
 class LawUpdatesResource(Resource):
     """``checkbox.law_updates``"""
 
@@ -3328,6 +3504,9 @@ class ResourceNamespaces:
     notice_sends: NoticeSendsResource
     notice_settings: NoticeSettingsResource
     notices: NoticesResource
+    notice_cohorts: NoticeCohortsResource
+    notice_plans: NoticePlansResource
+    stripe_emails: StripeEmailsResource
     law_updates: LawUpdatesResource
     checks: ChecksResource
     visitor_regions: VisitorRegionsResource
@@ -3371,6 +3550,9 @@ RESOURCES = {
     "notice_sends": NoticeSendsResource,
     "notice_settings": NoticeSettingsResource,
     "notices": NoticesResource,
+    "notice_cohorts": NoticeCohortsResource,
+    "notice_plans": NoticePlansResource,
+    "stripe_emails": StripeEmailsResource,
     "law_updates": LawUpdatesResource,
     "checks": ChecksResource,
     "visitor_regions": VisitorRegionsResource,
