@@ -4553,6 +4553,8 @@ NoticeSend = TypedDict(
         "created": int,
         #: Evidence record of the sent email.
         "evidence": Optional[str],
+        #: How strong the proof of sending is (the same levels as a due notice's proof.level): accepted (the provider accepted the message Checkbox rendered; counts), bounced (does not count). null while not sent.
+        "proof_level": Optional[Literal["accepted", "bounced"]],
     },
     total=False,
 )
@@ -4785,6 +4787,58 @@ RenderedNoticeEmail = TypedDict(
 )
 
 
+NoticeProofCopiesItem = TypedDict(
+    "NoticeProofCopiesItem",
+    {
+        #: When the copy arrived. Unix timestamp in seconds.
+        "received": int,
+        #: The copy passed the content check for its kind (or was not graded).
+        "complete": bool,
+        #: false: Checkbox could not grade the copy (no price on record for this subscription); it counts as received.
+        "graded": bool,
+        #: What the copy misses (the failing checks), when incomplete.
+        "missing": List[str],
+        #: Evidence record of the copy (ev_…).
+        "evidence": Optional[str],
+    },
+    total=False,
+)
+
+
+#: Set when a send was recorded but no longer counts.
+NoticeProofReopened = TypedDict(
+    "NoticeProofReopened",
+    {
+        #: When it was reopened. Unix timestamp in seconds.
+        "at": int,
+        #: reported_unconfirmed: a reported send got no copy or provider event in time; copy_incomplete: a copy showed the email missed a required element.
+        "reason": Literal["reported_unconfirmed", "copy_incomplete"],
+    },
+    total=False,
+)
+
+
+#: The proof that a notice was sent, and how strong it is.
+NoticeProof = TypedDict(
+    "NoticeProof",
+    {
+        #: How strong the proof is that the notice was sent. delivered: the provider says delivered; accepted: the provider accepted it; copy_received: the bcc address got a copy that passed the content check; copy_incomplete: a copy arrived but misses a required element (the notice stays open); reported_sent: your API call or the dashboard said it was sent, with no copy or provider event (it counts only until reported_counts_until); bounced. null: nothing heard yet.
+        "level": Optional[Literal["delivered", "accepted", "copy_received", "copy_incomplete", "reported_sent", "bounced"]],
+        #: Plain label of level.
+        "label": Optional[str],
+        #: true when this proof satisfies the notice now (a reported send counts until reported_counts_until).
+        "counts": bool,
+        #: A reported send counts until then (window end + 6 hours, or 6 hours after a late report); after it, without a copy or provider event, the notice is overdue again. null otherwise. Unix timestamp in seconds.
+        "reported_counts_until": Optional[int],
+        #: BCC copies received for this notice, oldest first.
+        "copies": List["NoticeProofCopiesItem"],
+        #: Set when a send was recorded but no longer counts.
+        "reopened": Optional["NoticeProofReopened"],
+    },
+    total=False,
+)
+
+
 #: Who the notice is for.
 DueNoticeSubscriber = TypedDict(
     "DueNoticeSubscriber",
@@ -4806,7 +4860,7 @@ DueNoticeSubscriber = TypedDict(
 )
 
 
-#: Proof it was sent; null until then.
+#: The send that closed it; null until then. Its strength is in proof.
 DueNoticeSent = TypedDict(
     "DueNoticeSent",
     {
@@ -4879,8 +4933,9 @@ DueNotice = TypedDict(
         "email": "RenderedNoticeEmail",
         #: This notice's own BCC address (it carries a secret token: do not publish it). BCC it when you send the email: Checkbox marks this notice sent with the copy as evidence. A copy that arrives before window_start does not count.
         "bcc": str,
-        #: Proof it was sent; null until then.
+        #: The send that closed it; null until then. Its strength is in proof.
         "sent": Optional["DueNoticeSent"],
+        "proof": "NoticeProof",
         #: Set when you recorded an overdue notice as not sent (markNoticeMissed); null otherwise.
         "missed": Optional["DueNoticeMissed"],
         #: When Checkbox first computed the notice. Unix timestamp in seconds.
@@ -5279,6 +5334,210 @@ CreateNoticePlanParams = TypedDict(
         "site": str,
         #: Schedule to dry-run. Default: the site's current schedule. (optional)
         "schedule": Literal["simple", "minimum_per_state"],
+    },
+    total=False,
+)
+
+
+#: The exact content Checkbox holds, or null (a reported send has none).
+NoticeRecordContentValue = TypedDict(
+    "NoticeRecordContentValue",
+    {
+        #: Exact subject line Checkbox holds (the BCC copy, or the email Checkbox sent).
+        "subject": str,
+        #: SHA-256 of subject (UTF-8).
+        "subject_sha256": str,
+        #: Exact plain-text body (cut at 200,000 characters), or null.
+        "text": Optional[str],
+        #: SHA-256 of text.
+        "text_sha256": Optional[str],
+        #: Exact HTML body (cut at 200,000 characters), or null.
+        "html": Optional[str],
+        #: SHA-256 of html.
+        "html_sha256": Optional[str],
+        #: Evidence record of the raw email (ev_…).
+        "evidence": Optional[str],
+    },
+    total=False,
+)
+
+
+#: The exact content Checkbox holds, or null (a reported send has none).
+NoticeRecordContent = Optional["NoticeRecordContentValue"]
+
+
+#: One event in a notice's history, as received.
+NoticeRecordEvent = TypedDict(
+    "NoticeRecordEvent",
+    {
+        #: What happened.
+        "type": Literal["reported_sent", "copy_received", "copy_incomplete", "reopened", "accepted", "bounced", "missed", "canceled"],
+        #: When (ISO 8601).
+        "at": str,
+        #: The event as received: graded and missing for a copy, the reason for a reopen, provider ids, the bounce payload. (optional)
+        "detail": Dict[str, Any],
+    },
+    total=False,
+)
+
+
+#: The send window.
+NoticeRecordWindow = TypedDict(
+    "NoticeRecordWindow",
+    {
+        #: Earliest moment the notice satisfies the law.
+        "start": Optional[str],
+        #: Latest moment.
+        "end": Optional[str],
+        #: Recommended (or scheduled) send time.
+        "send_at": Optional[str],
+        #: The event the notice announces.
+        "anchor": Optional[str],
+    },
+    total=False,
+)
+
+
+#: The send that closed it, or null.
+NoticeRecordSent = TypedDict(
+    "NoticeRecordSent",
+    {
+        #: When it was sent.
+        "at": str,
+        #: api, bcc, dashboard (you send) or checkbox.
+        "source": str,
+        #: Sent after the window closed.
+        "late": bool,
+        #: Email provider, when known.
+        "provider": Optional[str],
+        #: Provider message id, when given.
+        "provider_message_id": Optional[str],
+    },
+    total=False,
+)
+
+
+#: How strong the proof of sending is (for a due notice, the full NoticeProof object).
+NoticeRecordProof = TypedDict(
+    "NoticeRecordProof",
+    {
+        #: delivered, accepted, copy_received, copy_incomplete, reported_sent or bounced.
+        "level": Optional[str],
+        #: Plain label.
+        "label": Optional[str],
+        #: This proof satisfies the notice now.
+        "counts": bool,
+    },
+    total=False,
+)
+
+
+#: Everything Checkbox holds about one notice, for defense.
+NoticeRecord = TypedDict(
+    "NoticeRecord",
+    {
+        #: The notice: a due notice (ntd_…, you send) or a Checkbox send (ntc_…).
+        "notice": str,
+        #: Who sends it: you (tracked by Checkbox) or Checkbox Notices.
+        "source": Literal["you_send", "checkbox_sends"],
+        #: Notice kind.
+        "kind": str,
+        #: Human label of the kind.
+        "label": str,
+        #: Which occurrence (the billing cycle or event it is for).
+        "cycle": str,
+        #: Status now (due notice: upcoming, due, sent, overdue, canceled, missed; Checkbox send: sent, failed, bounced, skipped).
+        "status": str,
+        #: Billing-platform subscription id.
+        "subscription": str,
+        #: Billing-platform customer id, when known.
+        "customer": Optional[str],
+        #: Billing platform.
+        "platform": str,
+        #: SHA-256 of the recipient address (lowercased). Never the address.
+        "recipient_sha256": Optional[str],
+        #: From header of the email Checkbox holds.
+        "from": Optional[str],
+        #: The cohort (coh_…) the notice belongs to, for required due notices.
+        "cohort": Optional[str],
+        #: The send window.
+        "window": "NoticeRecordWindow",
+        #: Jurisdictions whose rules set the window.
+        "jurisdictions": List[str],
+        #: Catalog requirements behind it.
+        "requirement_ids": List[str],
+        #: Rules engine version that computed it.
+        "rules_version": str,
+        #: Legal catalog version.
+        "catalog_version": str,
+        #: The send that closed it, or null.
+        "sent": Optional["NoticeRecordSent"],
+        #: How strong the proof of sending is (for a due notice, the full NoticeProof object).
+        "proof": "NoticeRecordProof",
+        "content": "NoticeRecordContent",
+        #: History, oldest first.
+        "events": List["NoticeRecordEvent"],
+    },
+    total=False,
+)
+
+
+#: What these records cover.
+NoticeRecordsScope = TypedDict(
+    "NoticeRecordsScope",
+    {
+        #: The subscriber, when exported per subscriber. (optional)
+        "subscription": str,
+        #: The cohort, when exported per cohort. (optional)
+        "cohort": str,
+        #: True when the cohort has more than 500 subscribers and only the first 500 are included. (optional)
+        "cohort_truncated": bool,
+    },
+    total=False,
+)
+
+
+#: The schedule approval in force (createNoticePlan / approveNoticePlan), or null.
+NoticeRecordsApproval = TypedDict(
+    "NoticeRecordsApproval",
+    {
+        #: The approved notice plan (ntcp_…).
+        "plan": str,
+        #: The schedule it approved.
+        "schedule": str,
+        #: Who approved it (a user or API key id, never an email address).
+        "approved_by": Optional[str],
+        #: When.
+        "approved_at": str,
+    },
+    total=False,
+)
+
+
+#: The records of a subscriber's (or a cohort's) notices: content and hashes, windows, rules, proof levels and events.
+NoticeRecords = TypedDict(
+    "NoticeRecords",
+    {
+        #: Always notice_records.
+        "object": Literal["notice_records"],
+        #: Live or test-mode subscribers.
+        "livemode": bool,
+        #: The site.
+        "site": str,
+        #: What these records cover.
+        "scope": "NoticeRecordsScope",
+        #: When the document was generated (ISO 8601).
+        "generated": str,
+        #: Rules engine version.
+        "rules_version": str,
+        #: Legal catalog version.
+        "catalog_version": str,
+        #: The schedule approval in force (createNoticePlan / approveNoticePlan), or null.
+        "approval": Optional["NoticeRecordsApproval"],
+        #: One record per notice, oldest first.
+        "records": List["NoticeRecord"],
+        #: How to read the records.
+        "note": str,
     },
     total=False,
 )
@@ -9496,6 +9755,36 @@ ListNoticeCohortsParams = TypedDict(
         "site": str,
         #: Preview this schedule. Default: the site's current one. (optional)
         "schedule": Literal["simple", "minimum_per_state"],
+    },
+    total=False,
+)
+
+
+#: Parameters of `notice_records.list()` (listNoticeRecords).
+ListNoticeRecordsParams = TypedDict(
+    "ListNoticeRecordsParams",
+    {
+        #: Site (site_…).
+        "site": str,
+        #: One subscriber: the billing-platform subscription id (a timeline of every notice). Give this or cohort. (optional)
+        "subscription": str,
+        #: One cohort (coh_…, from listNoticeCohorts, e.g. coh_3f9a1c2e7b4d): its current members' notices of that kind. Give this or subscription. (optional)
+        "cohort": str,
+    },
+    total=False,
+)
+
+
+#: Parameters of `notice_records.export()` (exportNoticeRecords).
+ExportNoticeRecordsParams = TypedDict(
+    "ExportNoticeRecordsParams",
+    {
+        #: Site (site_…).
+        "site": str,
+        #: One subscriber: the billing-platform subscription id (a timeline of every notice). Give this or cohort. (optional)
+        "subscription": str,
+        #: One cohort (coh_…, from listNoticeCohorts, e.g. coh_3f9a1c2e7b4d): its current members' notices of that kind. Give this or subscription. (optional)
+        "cohort": str,
     },
     total=False,
 )

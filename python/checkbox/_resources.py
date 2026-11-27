@@ -1132,6 +1132,40 @@ OPERATIONS: Dict[str, Dict[str, Any]] = {
         "paginated": False,
         "summary": "Approve a notice plan",
     },
+    "listNoticeRecords": {
+        "operation_id": "listNoticeRecords",
+        "namespace": "notice_records",
+        "method": "list",
+        "http_method": "GET",
+        "path": "/v1/notices/records",
+        "path_params": (),
+        "query_params": ("site", "subscription", "cohort", ),
+        "body": False,
+        "idempotent": False,
+        "auth": True,
+        "scope": "notices:read",
+        "response": "json",
+        "list": False,
+        "paginated": False,
+        "summary": "List notice records",
+    },
+    "exportNoticeRecords": {
+        "operation_id": "exportNoticeRecords",
+        "namespace": "notice_records",
+        "method": "export",
+        "http_method": "GET",
+        "path": "/v1/notices/records/export",
+        "path_params": (),
+        "query_params": ("site", "subscription", "cohort", ),
+        "body": False,
+        "idempotent": False,
+        "auth": True,
+        "scope": "notices:read",
+        "response": "binary",
+        "list": False,
+        "paginated": False,
+        "summary": "Download a self-verifying notice records bundle",
+    },
     "retrieveStripeEmails": {
         "operation_id": "retrieveStripeEmails",
         "namespace": "stripe_emails",
@@ -2770,7 +2804,7 @@ class NoticesResource(Resource):
     def mark_sent(self, notice: str, params: Optional["types.MarkNoticeSentParams"] = None, /, *, request_options: Optional[RequestOptions] = None, **kwargs: Any) -> "types.DueNotice":
         """Mark a due notice as sent.
 
-        Records that you sent this notice (optionally with your email provider's message id). Idempotent: a notice already marked sent is returned unchanged. A send before window_start is refused (it does not satisfy the law: send again inside the window). An overdue notice marked sent stops failing its check and is recorded as late; a sent_at earlier than when it became overdue is refused (only the BCC copy can prove an in-window send). Canceled and missed notices cannot be marked. BCC'ing the notice's bcc address does the same with the email itself as evidence.
+        Records that you sent this notice (optionally with your email provider's message id). This is a reported send (proof.level reported_sent): it counts only until proof.reported_counts_until (window_end + 6 hours, or 6 hours after a late report). After that, without a copy of the email at the notice's bcc address (or a provider event), the notice is overdue again and its check fails. BCC the bcc address when you send so the email itself is the proof (proof.level copy_received). Idempotent: a notice already marked sent is returned unchanged. A send before window_start is refused (it does not satisfy the law: send again inside the window). A sent_at earlier than when an overdue notice became overdue is refused (only the copy can prove an in-window send). Canceled and missed notices cannot be marked.
 
         Parameters can be given as a dict (positional) or as keyword arguments.
 
@@ -2836,6 +2870,32 @@ class NoticePlansResource(Resource):
         ``POST /v1/notices/plans/{plan}/approve`` (operation ``approveNoticePlan``, scope ``notices:write``).
         """
         return self._call("approveNoticePlan", (plan, ), None, None, request_options)  # type: ignore[no-any-return]
+
+
+class NoticeRecordsResource(Resource):
+    """``checkbox.notice_records``"""
+
+    def list(self, params: Optional["types.ListNoticeRecordsParams"] = None, /, *, request_options: Optional[RequestOptions] = None, **kwargs: Any) -> "types.NoticeRecords":
+        """List notice records.
+
+        The records of one subscriber's notices (subscription) or one cohort's (cohort): for each notice the exact content Checkbox holds with its SHA-256, the recipient's hash (never the address), the window, jurisdictions, requirement ids and rules version, the provider ids, the delivery events as received, the proof level and the schedule approval. exportNoticeRecords returns the same document as a signed, self-verifying ZIP.
+
+        Parameters can be given as a dict (positional) or as keyword arguments.
+
+        ``GET /v1/notices/records`` (operation ``listNoticeRecords``, scope ``notices:read``).
+        """
+        return self._call("listNoticeRecords", (), params, kwargs, request_options)  # type: ignore[no-any-return]
+
+    def export(self, params: Optional["types.ExportNoticeRecordsParams"] = None, /, *, request_options: Optional[RequestOptions] = None, **kwargs: Any) -> "CheckboxFile":
+        """Download a self-verifying notice records bundle.
+
+        ZIP for a lawyer or court expert: the records document (listNoticeRecords) stored as one evidence record in the site's hash-chained vault, with manifest.json (its chain links) + manifest.sig.json, RECORDS.md and verify.mjs (zero-dependency offline verifier: node verify.mjs --keys checkbox-keys.json). Give subscription or cohort.
+
+        Parameters can be given as a dict (positional) or as keyword arguments.
+
+        ``GET /v1/notices/records/export`` (operation ``exportNoticeRecords``, scope ``notices:read``).
+        """
+        return self._call("exportNoticeRecords", (), params, kwargs, request_options)  # type: ignore[no-any-return]
 
 
 class StripeEmailsResource(Resource):
@@ -3506,6 +3566,7 @@ class ResourceNamespaces:
     notices: NoticesResource
     notice_cohorts: NoticeCohortsResource
     notice_plans: NoticePlansResource
+    notice_records: NoticeRecordsResource
     stripe_emails: StripeEmailsResource
     law_updates: LawUpdatesResource
     checks: ChecksResource
@@ -3552,6 +3613,7 @@ RESOURCES = {
     "notices": NoticesResource,
     "notice_cohorts": NoticeCohortsResource,
     "notice_plans": NoticePlansResource,
+    "notice_records": NoticeRecordsResource,
     "stripe_emails": StripeEmailsResource,
     "law_updates": LawUpdatesResource,
     "checks": ChecksResource,

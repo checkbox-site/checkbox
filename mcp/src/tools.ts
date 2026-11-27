@@ -2861,7 +2861,7 @@ const markNoticeSent: ToolDef = {
   name: 'mark_notice_sent',
   title: 'Mark a required email as sent (or missed)',
   description:
-    'Records that the merchant sent a due notice (ntd_…), optionally with the email provider\'s message id. Idempotent. Only call this after the email was actually sent: a send before the window opens is refused, and an overdue notice marked sent is recorded as late. For an overdue notice that was not and will not be sent, pass missed: true (with a reason) instead: it is recorded as missed, no send is attested.',
+    'Records that the merchant sent a due notice (ntd_…), optionally with the email provider\'s message id: a reported send, which counts only until window end + 6 h unless a copy reaches the notice\'s bcc address (BCC it). Idempotent. Only call after the email was sent: a send before the window opens is refused. For an overdue notice that was not and will not be sent, pass missed: true (with a reason) instead: it is recorded as missed, no send is attested.',
   input: {
     notice: z.string().max(100).describe('Due notice id (ntd_…).'),
     provider_message_id: z.string().max(500).optional().describe('The email provider\'s message id (Resend / Postmark / SES).'),

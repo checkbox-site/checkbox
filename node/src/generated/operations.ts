@@ -1128,6 +1128,40 @@ export const OPERATIONS = {
     paginated: false,
     summary: "Approve a notice plan",
   },
+  listNoticeRecords: {
+    operationId: "listNoticeRecords",
+    namespace: "noticeRecords",
+    method: "list",
+    httpMethod: "GET",
+    path: "/v1/notices/records",
+    pathParams: [],
+    queryParams: ["site","subscription","cohort"],
+    body: false,
+    idempotent: false,
+    auth: true,
+    scope: "notices:read",
+    response: "json",
+    list: false,
+    paginated: false,
+    summary: "List notice records",
+  },
+  exportNoticeRecords: {
+    operationId: "exportNoticeRecords",
+    namespace: "noticeRecords",
+    method: "export",
+    httpMethod: "GET",
+    path: "/v1/notices/records/export",
+    pathParams: [],
+    queryParams: ["site","subscription","cohort"],
+    body: false,
+    idempotent: false,
+    auth: true,
+    scope: "notices:read",
+    response: "binary",
+    list: false,
+    paginated: false,
+    summary: "Download a self-verifying notice records bundle",
+  },
   retrieveStripeEmails: {
     operationId: "retrieveStripeEmails",
     namespace: "stripeEmails",
@@ -2153,6 +2187,8 @@ export interface OperationTypes {
   createNoticePlan: { args: T.CreateNoticePlanParams; response: T.NoticePlan };
   retrieveNoticePlan: { args: { plan: string }; response: T.NoticePlan };
   approveNoticePlan: { args: { plan: string }; response: T.NoticePlan };
+  listNoticeRecords: { args: T.ListNoticeRecordsParams; response: T.NoticeRecords };
+  exportNoticeRecords: { args: T.ExportNoticeRecordsParams; response: T.CheckboxFile };
   retrieveStripeEmails: { args: T.RetrieveStripeEmailsParams; response: T.StripeEmails };
   setStripeEmails: { args: T.SetStripeEmailsParams; response: T.StripeEmails };
   listLawUpdates: { args: T.ListLawUpdatesParams; response: T.LawUpdateList };
@@ -2999,7 +3035,7 @@ export class NoticesResource extends Resource {
   /**
    * Mark a due notice as sent.
    *
-   * Records that you sent this notice (optionally with your email provider's message id). Idempotent: a notice already marked sent is returned unchanged. A send before window_start is refused (it does not satisfy the law: send again inside the window). An overdue notice marked sent stops failing its check and is recorded as late; a sent_at earlier than when it became overdue is refused (only the BCC copy can prove an in-window send). Canceled and missed notices cannot be marked. BCC'ing the notice's bcc address does the same with the email itself as evidence.
+   * Records that you sent this notice (optionally with your email provider's message id). This is a reported send (proof.level reported_sent): it counts only until proof.reported_counts_until (window_end + 6 hours, or 6 hours after a late report). After that, without a copy of the email at the notice's bcc address (or a provider event), the notice is overdue again and its check fails. BCC the bcc address when you send so the email itself is the proof (proof.level copy_received). Idempotent: a notice already marked sent is returned unchanged. A send before window_start is refused (it does not satisfy the law: send again inside the window). A sent_at earlier than when an overdue notice became overdue is refused (only the copy can prove an in-window send). Canceled and missed notices cannot be marked.
    *
    * @param notice Unique identifier of the due notice (ntd_…).
    * @see POST /v1/notices/{notice}/sent (operation `markNoticeSent`, scope `notices:write`)
@@ -3072,6 +3108,32 @@ export class NoticePlansResource extends Resource {
    */
   approve(plan: string, options?: RequestOptions): Promise<T.NoticePlan> {
     return this._request(OPERATIONS.approveNoticePlan, [plan], undefined, options) as Promise<T.NoticePlan>;
+  }
+
+}
+
+/** `checkbox.noticeRecords` */
+export class NoticeRecordsResource extends Resource {
+  /**
+   * List notice records.
+   *
+   * The records of one subscriber's notices (subscription) or one cohort's (cohort): for each notice the exact content Checkbox holds with its SHA-256, the recipient's hash (never the address), the window, jurisdictions, requirement ids and rules version, the provider ids, the delivery events as received, the proof level and the schedule approval. exportNoticeRecords returns the same document as a signed, self-verifying ZIP.
+   *
+   * @see GET /v1/notices/records (operation `listNoticeRecords`, scope `notices:read`)
+   */
+  list(params: T.ListNoticeRecordsParams, options?: RequestOptions): Promise<T.NoticeRecords> {
+    return this._request(OPERATIONS.listNoticeRecords, [], params, options) as Promise<T.NoticeRecords>;
+  }
+
+  /**
+   * Download a self-verifying notice records bundle.
+   *
+   * ZIP for a lawyer or court expert: the records document (listNoticeRecords) stored as one evidence record in the site's hash-chained vault, with manifest.json (its chain links) + manifest.sig.json, RECORDS.md and verify.mjs (zero-dependency offline verifier: node verify.mjs --keys checkbox-keys.json). Give subscription or cohort.
+   *
+   * @see GET /v1/notices/records/export (operation `exportNoticeRecords`, scope `notices:read`)
+   */
+  export(params: T.ExportNoticeRecordsParams, options?: RequestOptions): Promise<T.CheckboxFile> {
+    return this._request(OPERATIONS.exportNoticeRecords, [], params, options) as Promise<T.CheckboxFile>;
   }
 
 }
@@ -3831,6 +3893,7 @@ export const RESOURCES = {
   notices: NoticesResource,
   noticeCohorts: NoticeCohortsResource,
   noticePlans: NoticePlansResource,
+  noticeRecords: NoticeRecordsResource,
   stripeEmails: StripeEmailsResource,
   lawUpdates: LawUpdatesResource,
   checks: ChecksResource,

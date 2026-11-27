@@ -13451,6 +13451,18 @@
             ],
             "description": "Evidence record of the sent email.",
             "example": "ev_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "proof_level": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "accepted",
+              "bounced"
+            ],
+            "description": "How strong the proof of sending is (the same levels as a due notice's proof.level): accepted (the provider accepted the message Checkbox rendered; counts), bounced (does not count). null while not sent.",
+            "example": "accepted"
           }
         },
         "required": [
@@ -13470,7 +13482,8 @@
           "due",
           "sent",
           "created",
-          "evidence"
+          "evidence",
+          "proof_level"
         ],
         "description": "One email Checkbox Notices sent (or tried to send) for the site."
       },
@@ -13509,7 +13522,8 @@
                 "due": 1793318400,
                 "sent": 1793318400,
                 "created": 1793318400,
-                "evidence": "ev_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+                "evidence": "ev_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b",
+                "proof_level": "accepted"
               }
             ]
           },
@@ -14167,6 +14181,144 @@
         ],
         "description": "The email for this subscriber, rendered from Checkbox's template. Ready to send only when missing_fields is empty; it then passes the preflight email check for its kind."
       },
+      "NoticeProof": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "delivered",
+              "accepted",
+              "copy_received",
+              "copy_incomplete",
+              "reported_sent",
+              "bounced"
+            ],
+            "description": "How strong the proof is that the notice was sent. delivered: the provider says delivered; accepted: the provider accepted it; copy_received: the bcc address got a copy that passed the content check; copy_incomplete: a copy arrived but misses a required element (the notice stays open); reported_sent: your API call or the dashboard said it was sent, with no copy or provider event (it counts only until reported_counts_until); bounced. null: nothing heard yet.",
+            "example": "copy_received"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Plain label of level.",
+            "example": "Copy received"
+          },
+          "counts": {
+            "type": "boolean",
+            "description": "true when this proof satisfies the notice now (a reported send counts until reported_counts_until).",
+            "example": true
+          },
+          "reported_counts_until": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "A reported send counts until then (window end + 6 hours, or 6 hours after a late report); after it, without a copy or provider event, the notice is overdue again. null otherwise. Unix timestamp in seconds.",
+            "example": 1793318400
+          },
+          "copies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "received": {
+                  "type": "integer",
+                  "description": "When the copy arrived. Unix timestamp in seconds.",
+                  "example": 1793318400
+                },
+                "complete": {
+                  "type": "boolean",
+                  "description": "The copy passed the content check for its kind (or was not graded).",
+                  "example": true
+                },
+                "graded": {
+                  "type": "boolean",
+                  "description": "false: Checkbox could not grade the copy (no price on record for this subscription); it counts as received.",
+                  "example": true
+                },
+                "missing": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "What the copy misses (the failing checks), when incomplete.",
+                  "example": []
+                },
+                "evidence": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Evidence record of the copy (ev_…).",
+                  "example": null
+                }
+              },
+              "required": [
+                "received",
+                "complete",
+                "graded",
+                "missing",
+                "evidence"
+              ]
+            },
+            "description": "BCC copies received for this notice, oldest first.",
+            "example": [
+              {
+                "received": 1793318400,
+                "complete": true,
+                "graded": true,
+                "missing": [],
+                "evidence": null
+              }
+            ]
+          },
+          "reopened": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "at": {
+                "type": "integer",
+                "description": "When it was reopened. Unix timestamp in seconds.",
+                "example": 1793318400
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "reported_unconfirmed",
+                  "copy_incomplete"
+                ],
+                "description": "reported_unconfirmed: a reported send got no copy or provider event in time; copy_incomplete: a copy showed the email missed a required element.",
+                "example": "reported_unconfirmed"
+              }
+            },
+            "required": [
+              "at",
+              "reason"
+            ],
+            "description": "Set when a send was recorded but no longer counts.",
+            "example": {
+              "at": 1793318400,
+              "reason": "reported_unconfirmed"
+            }
+          }
+        },
+        "required": [
+          "level",
+          "label",
+          "counts",
+          "reported_counts_until",
+          "copies",
+          "reopened"
+        ],
+        "description": "The proof that a notice was sent, and how strong it is."
+      },
       "DueNotice": {
         "type": "object",
         "properties": {
@@ -14407,7 +14559,7 @@
               "provider_message_id",
               "evidence"
             ],
-            "description": "Proof it was sent; null until then.",
+            "description": "The send that closed it; null until then. Its strength is in proof.",
             "example": {
               "at": 1793318400,
               "source": "bcc",
@@ -14415,6 +14567,9 @@
               "provider_message_id": "re_9f8e7d6c",
               "evidence": null
             }
+          },
+          "proof": {
+            "$ref": "#/components/schemas/NoticeProof"
           },
           "missed": {
             "type": [
@@ -14500,6 +14655,7 @@
           "email",
           "bcc",
           "sent",
+          "proof",
           "missed",
           "created",
           "updated",
@@ -14571,6 +14727,25 @@
                   "late": false,
                   "provider_message_id": "re_9f8e7d6c",
                   "evidence": null
+                },
+                "proof": {
+                  "level": "copy_received",
+                  "label": "Copy received",
+                  "counts": true,
+                  "reported_counts_until": 1793318400,
+                  "copies": [
+                    {
+                      "received": 1793318400,
+                      "complete": true,
+                      "graded": true,
+                      "missing": [],
+                      "evidence": null
+                    }
+                  ],
+                  "reopened": {
+                    "at": 1793318400,
+                    "reason": "reported_unconfirmed"
+                  }
                 },
                 "missed": {
                   "at": 1793318400,
@@ -15675,6 +15850,600 @@
         "required": [
           "site"
         ]
+      },
+      "NoticeRecordContent": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "Exact subject line Checkbox holds (the BCC copy, or the email Checkbox sent).",
+            "example": "Your Pro plan renews on December 20, 2026"
+          },
+          "subject_sha256": {
+            "type": "string",
+            "description": "SHA-256 of subject (UTF-8).",
+            "example": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact plain-text body (cut at 200,000 characters), or null.",
+            "example": "Hi Alex, your Pro plan renews on December 20, 2026 for $199.00…"
+          },
+          "text_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SHA-256 of text.",
+            "example": null
+          },
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact HTML body (cut at 200,000 characters), or null.",
+            "example": null
+          },
+          "html_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SHA-256 of html.",
+            "example": null
+          },
+          "evidence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Evidence record of the raw email (ev_…).",
+            "example": null
+          }
+        },
+        "required": [
+          "subject",
+          "subject_sha256",
+          "text",
+          "text_sha256",
+          "html",
+          "html_sha256",
+          "evidence"
+        ],
+        "description": "The exact content Checkbox holds, or null (a reported send has none)."
+      },
+      "NoticeRecordEvent": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "reported_sent",
+              "copy_received",
+              "copy_incomplete",
+              "reopened",
+              "accepted",
+              "bounced",
+              "missed",
+              "canceled"
+            ],
+            "description": "What happened.",
+            "example": "copy_received"
+          },
+          "at": {
+            "type": "string",
+            "description": "When (ISO 8601).",
+            "example": "2026-11-25T14:02:11.000Z"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "The event as received: graded and missing for a copy, the reason for a reopen, provider ids, the bounce payload.",
+            "example": {
+              "graded": true
+            }
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "description": "One event in a notice's history, as received."
+      },
+      "NoticeRecord": {
+        "type": "object",
+        "properties": {
+          "notice": {
+            "type": "string",
+            "description": "The notice: a due notice (ntd_…, you send) or a Checkbox send (ntc_…).",
+            "example": "ntd_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "you_send",
+              "checkbox_sends"
+            ],
+            "description": "Who sends it: you (tracked by Checkbox) or Checkbox Notices.",
+            "example": "you_send"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Notice kind.",
+            "example": "renewal_reminder"
+          },
+          "label": {
+            "type": "string",
+            "description": "Human label of the kind.",
+            "example": "Renewal reminder"
+          },
+          "cycle": {
+            "type": "string",
+            "description": "Which occurrence (the billing cycle or event it is for).",
+            "example": "2026-12-20"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status now (due notice: upcoming, due, sent, overdue, canceled, missed; Checkbox send: sent, failed, bounced, skipped).",
+            "example": "sent"
+          },
+          "subscription": {
+            "type": "string",
+            "description": "Billing-platform subscription id.",
+            "example": "sub_1QabcXYZ"
+          },
+          "customer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Billing-platform customer id, when known.",
+            "example": "cus_Qabc123"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Billing platform.",
+            "example": "stripe"
+          },
+          "recipient_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SHA-256 of the recipient address (lowercased). Never the address.",
+            "example": null
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "From header of the email Checkbox holds.",
+            "example": "Acme <billing@acme.example>"
+          },
+          "cohort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cohort (coh_…) the notice belongs to, for required due notices.",
+            "example": "coh_3f9a1c2e7b4d"
+          },
+          "window": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Earliest moment the notice satisfies the law.",
+                "example": "2026-11-05T00:00:00.000Z"
+              },
+              "end": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Latest moment.",
+                "example": "2026-12-05T00:00:00.000Z"
+              },
+              "send_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Recommended (or scheduled) send time.",
+                "example": "2026-11-20T15:00:00.000Z"
+              },
+              "anchor": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The event the notice announces.",
+                "example": "2026-12-20T00:00:00.000Z"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "send_at",
+              "anchor"
+            ],
+            "description": "The send window.",
+            "example": {
+              "start": "2026-11-05T00:00:00.000Z",
+              "end": "2026-12-05T00:00:00.000Z",
+              "send_at": "2026-11-20T15:00:00.000Z",
+              "anchor": "2026-12-20T00:00:00.000Z"
+            }
+          },
+          "jurisdictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Jurisdictions whose rules set the window.",
+            "example": [
+              "US-CA"
+            ]
+          },
+          "requirement_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Catalog requirements behind it.",
+            "example": [
+              "US-CA.17602.b.2"
+            ]
+          },
+          "rules_version": {
+            "type": "string",
+            "description": "Rules engine version that computed it.",
+            "example": "2026.11.1"
+          },
+          "catalog_version": {
+            "type": "string",
+            "description": "Legal catalog version.",
+            "example": "2026-11-01"
+          },
+          "sent": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "description": "When it was sent.",
+                "example": "2026-11-20T15:01:00.000Z"
+              },
+              "source": {
+                "type": "string",
+                "description": "api, bcc, dashboard (you send) or checkbox.",
+                "example": "bcc"
+              },
+              "late": {
+                "type": "boolean",
+                "description": "Sent after the window closed.",
+                "example": false
+              },
+              "provider": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Email provider, when known.",
+                "example": null
+              },
+              "provider_message_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Provider message id, when given.",
+                "example": null
+              }
+            },
+            "required": [
+              "at",
+              "source",
+              "late",
+              "provider",
+              "provider_message_id"
+            ],
+            "description": "The send that closed it, or null.",
+            "example": {
+              "at": "2026-11-20T15:01:00.000Z",
+              "source": "bcc",
+              "late": false,
+              "provider": null,
+              "provider_message_id": null
+            }
+          },
+          "proof": {
+            "type": "object",
+            "properties": {
+              "level": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "delivered, accepted, copy_received, copy_incomplete, reported_sent or bounced.",
+                "example": "copy_received"
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Plain label.",
+                "example": "Copy received"
+              },
+              "counts": {
+                "type": "boolean",
+                "description": "This proof satisfies the notice now.",
+                "example": true
+              }
+            },
+            "required": [
+              "level",
+              "label",
+              "counts"
+            ],
+            "description": "How strong the proof of sending is (for a due notice, the full NoticeProof object).",
+            "example": {
+              "level": "copy_received",
+              "label": "Copy received",
+              "counts": true
+            }
+          },
+          "content": {
+            "$ref": "#/components/schemas/NoticeRecordContent"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeRecordEvent"
+            },
+            "description": "History, oldest first.",
+            "example": [
+              {
+                "type": "copy_received",
+                "at": "2026-11-25T14:02:11.000Z",
+                "detail": {
+                  "graded": true
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "notice",
+          "source",
+          "kind",
+          "label",
+          "cycle",
+          "status",
+          "subscription",
+          "customer",
+          "platform",
+          "recipient_sha256",
+          "from",
+          "cohort",
+          "window",
+          "jurisdictions",
+          "requirement_ids",
+          "rules_version",
+          "catalog_version",
+          "sent",
+          "proof",
+          "content",
+          "events"
+        ],
+        "description": "Everything Checkbox holds about one notice, for defense."
+      },
+      "NoticeRecords": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "enum": [
+              "notice_records"
+            ],
+            "description": "Always notice_records.",
+            "example": "notice_records"
+          },
+          "livemode": {
+            "type": "boolean",
+            "description": "Live or test-mode subscribers.",
+            "example": true
+          },
+          "site": {
+            "type": "string",
+            "description": "The site.",
+            "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "subscription": {
+                "type": "string",
+                "description": "The subscriber, when exported per subscriber.",
+                "example": "sub_1QabcXYZ"
+              },
+              "cohort": {
+                "type": "string",
+                "description": "The cohort, when exported per cohort.",
+                "example": "coh_3f9a1c2e7b4d"
+              },
+              "cohort_truncated": {
+                "type": "boolean",
+                "description": "True when the cohort has more than 500 subscribers and only the first 500 are included.",
+                "example": false
+              }
+            },
+            "description": "What these records cover.",
+            "example": {
+              "subscription": "sub_1QabcXYZ",
+              "cohort": "coh_3f9a1c2e7b4d",
+              "cohort_truncated": false
+            }
+          },
+          "generated": {
+            "type": "string",
+            "description": "When the document was generated (ISO 8601).",
+            "example": "2026-11-27T10:00:00.000Z"
+          },
+          "rules_version": {
+            "type": "string",
+            "description": "Rules engine version.",
+            "example": "2026.11.1"
+          },
+          "catalog_version": {
+            "type": "string",
+            "description": "Legal catalog version.",
+            "example": "2026-11-01"
+          },
+          "approval": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "plan": {
+                "type": "string",
+                "description": "The approved notice plan (ntcp_…).",
+                "example": "ntcp_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+              },
+              "schedule": {
+                "type": "string",
+                "description": "The schedule it approved.",
+                "example": "simple"
+              },
+              "approved_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Who approved it (a user or API key id, never an email address).",
+                "example": "api_key:key_123"
+              },
+              "approved_at": {
+                "type": "string",
+                "description": "When.",
+                "example": "2026-11-23T18:00:00.000Z"
+              }
+            },
+            "required": [
+              "plan",
+              "schedule",
+              "approved_by",
+              "approved_at"
+            ],
+            "description": "The schedule approval in force (createNoticePlan / approveNoticePlan), or null.",
+            "example": {
+              "plan": "ntcp_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b",
+              "schedule": "simple",
+              "approved_by": "api_key:key_123",
+              "approved_at": "2026-11-23T18:00:00.000Z"
+            }
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeRecord"
+            },
+            "description": "One record per notice, oldest first.",
+            "example": [
+              {
+                "notice": "ntd_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b",
+                "source": "you_send",
+                "kind": "renewal_reminder",
+                "label": "Renewal reminder",
+                "cycle": "2026-12-20",
+                "status": "sent",
+                "subscription": "sub_1QabcXYZ",
+                "customer": "cus_Qabc123",
+                "platform": "stripe",
+                "recipient_sha256": null,
+                "from": "Acme <billing@acme.example>",
+                "cohort": "coh_3f9a1c2e7b4d",
+                "window": {
+                  "start": "2026-11-05T00:00:00.000Z",
+                  "end": "2026-12-05T00:00:00.000Z",
+                  "send_at": "2026-11-20T15:00:00.000Z",
+                  "anchor": "2026-12-20T00:00:00.000Z"
+                },
+                "jurisdictions": [
+                  "US-CA"
+                ],
+                "requirement_ids": [
+                  "US-CA.17602.b.2"
+                ],
+                "rules_version": "2026.11.1",
+                "catalog_version": "2026-11-01",
+                "sent": {
+                  "at": "2026-11-20T15:01:00.000Z",
+                  "source": "bcc",
+                  "late": false,
+                  "provider": null,
+                  "provider_message_id": null
+                },
+                "proof": {
+                  "level": "copy_received",
+                  "label": "Copy received",
+                  "counts": true
+                },
+                "content": {
+                  "subject": "Your Pro plan renews on December 20, 2026",
+                  "subject_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                  "text": "Hi Alex, your Pro plan renews on December 20, 2026 for $199.00…",
+                  "text_sha256": null,
+                  "html": null,
+                  "html_sha256": null,
+                  "evidence": null
+                },
+                "events": [
+                  {
+                    "type": "copy_received",
+                    "at": "2026-11-25T14:02:11.000Z",
+                    "detail": {
+                      "graded": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "How to read the records.",
+            "example": "Recipients appear only as SHA-256 hashes…"
+          }
+        },
+        "required": [
+          "object",
+          "livemode",
+          "site",
+          "scope",
+          "generated",
+          "rules_version",
+          "catalog_version",
+          "approval",
+          "records",
+          "note"
+        ],
+        "description": "The records of a subscriber's (or a cohort's) notices: content and hashes, windows, rules, proof levels and events."
       },
       "StripeEmails": {
         "type": "object",
@@ -33183,7 +33952,7 @@
       "post": {
         "operationId": "markNoticeSent",
         "summary": "Mark a due notice as sent",
-        "description": "Records that you sent this notice (optionally with your email provider's message id). Idempotent: a notice already marked sent is returned unchanged. A send before window_start is refused (it does not satisfy the law: send again inside the window). An overdue notice marked sent stops failing its check and is recorded as late; a sent_at earlier than when it became overdue is refused (only the BCC copy can prove an in-window send). Canceled and missed notices cannot be marked. BCC'ing the notice's bcc address does the same with the email itself as evidence.",
+        "description": "Records that you sent this notice (optionally with your email provider's message id). This is a reported send (proof.level reported_sent): it counts only until proof.reported_counts_until (window_end + 6 hours, or 6 hours after a late report). After that, without a copy of the email at the notice's bcc address (or a provider event), the notice is overdue again and its check fails. BCC the bcc address when you send so the email itself is the proof (proof.level copy_received). Idempotent: a notice already marked sent is returned unchanged. A send before window_start is refused (it does not satisfy the law: send again inside the window). A sent_at earlier than when an overdue notice became overdue is refused (only the copy can prove an in-window send). Canceled and missed notices cannot be marked.",
         "tags": [
           "Notices"
         ],
@@ -33661,6 +34430,199 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoticePlan"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notices/records": {
+      "get": {
+        "operationId": "listNoticeRecords",
+        "summary": "List notice records",
+        "description": "The records of one subscriber's notices (subscription) or one cohort's (cohort): for each notice the exact content Checkbox holds with its SHA-256, the recipient's hash (never the address), the window, jurisdictions, requirement ids and rules version, the provider ids, the delivery events as received, the proof level and the schedule approval. exportNoticeRecords returns the same document as a signed, self-verifying ZIP.",
+        "tags": [
+          "Notices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-checkbox-scope": "notices:read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Site (site_…).",
+              "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+            },
+            "required": true,
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "One subscriber: the billing-platform subscription id (a timeline of every notice). Give this or cohort.",
+              "example": "sub_1QabcXYZ"
+            },
+            "required": false,
+            "name": "subscription",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "description": "One cohort (coh_…, from listNoticeCohorts, e.g. coh_3f9a1c2e7b4d): its current members' notices of that kind. Give this or subscription."
+            },
+            "required": false,
+            "name": "cohort",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "API version (date). Defaults to the version your account is pinned to. Known: 2026-10-30.",
+              "example": "2026-10-30"
+            },
+            "required": false,
+            "name": "Checkbox-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeRecords"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Error. See error.code (stable) and error.next_action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notices/records/export": {
+      "get": {
+        "operationId": "exportNoticeRecords",
+        "summary": "Download a self-verifying notice records bundle",
+        "description": "ZIP for a lawyer or court expert: the records document (listNoticeRecords) stored as one evidence record in the site's hash-chained vault, with manifest.json (its chain links) + manifest.sig.json, RECORDS.md and verify.mjs (zero-dependency offline verifier: node verify.mjs --keys checkbox-keys.json). Give subscription or cohort.",
+        "tags": [
+          "Notices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-checkbox-scope": "notices:read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Site (site_…).",
+              "example": "site_3f9a1c2e7b4d4e0f9a8b7c6d5e4f3a2b"
+            },
+            "required": true,
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "One subscriber: the billing-platform subscription id (a timeline of every notice). Give this or cohort.",
+              "example": "sub_1QabcXYZ"
+            },
+            "required": false,
+            "name": "subscription",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "description": "One cohort (coh_…, from listNoticeCohorts, e.g. coh_3f9a1c2e7b4d): its current members' notices of that kind. Give this or subscription."
+            },
+            "required": false,
+            "name": "cohort",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "API version (date). Defaults to the version your account is pinned to. Known: 2026-10-30.",
+              "example": "2026-10-30"
+            },
+            "required": false,
+            "name": "Checkbox-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file.",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "ZIP archive.",
+                  "example": ""
                 }
               }
             }

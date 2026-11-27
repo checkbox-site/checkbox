@@ -2912,6 +2912,8 @@ export interface NoticeSend {
   created: number;
   /** Evidence record of the sent email. */
   evidence: string | null;
+  /** How strong the proof of sending is (the same levels as a due notice's proof.level): accepted (the provider accepted the message Checkbox rendered; counts), bounced (does not count). null while not sent. */
+  proof_level: "accepted" | "bounced" | null;
 }
 
 /** A page of checkbox notices sends, newest first. */
@@ -3067,6 +3069,38 @@ export interface RenderedNoticeEmail {
   missing_fields: Array<string>;
 }
 
+/** The proof that a notice was sent, and how strong it is. */
+export interface NoticeProof {
+  /** How strong the proof is that the notice was sent. delivered: the provider says delivered; accepted: the provider accepted it; copy_received: the bcc address got a copy that passed the content check; copy_incomplete: a copy arrived but misses a required element (the notice stays open); reported_sent: your API call or the dashboard said it was sent, with no copy or provider event (it counts only until reported_counts_until); bounced. null: nothing heard yet. */
+  level: "delivered" | "accepted" | "copy_received" | "copy_incomplete" | "reported_sent" | "bounced" | null;
+  /** Plain label of level. */
+  label: string | null;
+  /** true when this proof satisfies the notice now (a reported send counts until reported_counts_until). */
+  counts: boolean;
+  /** A reported send counts until then (window end + 6 hours, or 6 hours after a late report); after it, without a copy or provider event, the notice is overdue again. null otherwise. Unix timestamp in seconds. */
+  reported_counts_until: number | null;
+  /** BCC copies received for this notice, oldest first. */
+  copies: Array<{
+    /** When the copy arrived. Unix timestamp in seconds. */
+    received: number;
+    /** The copy passed the content check for its kind (or was not graded). */
+    complete: boolean;
+    /** false: Checkbox could not grade the copy (no price on record for this subscription); it counts as received. */
+    graded: boolean;
+    /** What the copy misses (the failing checks), when incomplete. */
+    missing: Array<string>;
+    /** Evidence record of the copy (ev_…). */
+    evidence: string | null;
+  }>;
+  /** Set when a send was recorded but no longer counts. */
+  reopened: {
+    /** When it was reopened. Unix timestamp in seconds. */
+    at: number;
+    /** reported_unconfirmed: a reported send got no copy or provider event in time; copy_incomplete: a copy showed the email missed a required element. */
+    reason: "reported_unconfirmed" | "copy_incomplete";
+  } | null;
+}
+
 /** An email the merchant owes a subscriber, legally required (required: true) or recommended ("You send" mode): what, when, the email to send (ready once email.missing_fields is empty) and how to confirm it was sent. */
 export interface DueNotice {
   /** Unique identifier of the due notice (ntd_…). */
@@ -3119,7 +3153,7 @@ export interface DueNotice {
   email: RenderedNoticeEmail;
   /** This notice's own BCC address (it carries a secret token: do not publish it). BCC it when you send the email: Checkbox marks this notice sent with the copy as evidence. A copy that arrives before window_start does not count. */
   bcc: string;
-  /** Proof it was sent; null until then. */
+  /** The send that closed it; null until then. Its strength is in proof. */
   sent: {
     /** When it was sent. Unix timestamp in seconds. */
     at: number;
@@ -3132,6 +3166,7 @@ export interface DueNotice {
     /** Evidence record of the BCC copy (ev_…), when matched by BCC. */
     evidence: string | null;
   } | null;
+  proof: NoticeProof;
   /** Set when you recorded an overdue notice as not sent (markNoticeMissed); null otherwise. */
   missed: {
     /** When you recorded it as missed. Unix timestamp in seconds. */
@@ -3415,6 +3450,146 @@ export interface CreateNoticePlanParams {
   site: string;
   /** Schedule to dry-run. Default: the site's current schedule. */
   schedule?: "simple" | "minimum_per_state";
+}
+
+/** The exact content Checkbox holds, or null (a reported send has none). */
+export type NoticeRecordContent = {
+  /** Exact subject line Checkbox holds (the BCC copy, or the email Checkbox sent). */
+  subject: string;
+  /** SHA-256 of subject (UTF-8). */
+  subject_sha256: string;
+  /** Exact plain-text body (cut at 200,000 characters), or null. */
+  text: string | null;
+  /** SHA-256 of text. */
+  text_sha256: string | null;
+  /** Exact HTML body (cut at 200,000 characters), or null. */
+  html: string | null;
+  /** SHA-256 of html. */
+  html_sha256: string | null;
+  /** Evidence record of the raw email (ev_…). */
+  evidence: string | null;
+} | null;
+
+/** One event in a notice's history, as received. */
+export interface NoticeRecordEvent {
+  /** What happened. */
+  type: "reported_sent" | "copy_received" | "copy_incomplete" | "reopened" | "accepted" | "bounced" | "missed" | "canceled";
+  /** When (ISO 8601). */
+  at: string;
+  /** The event as received: graded and missing for a copy, the reason for a reopen, provider ids, the bounce payload. */
+  detail?: Record<string, unknown>;
+}
+
+/** Everything Checkbox holds about one notice, for defense. */
+export interface NoticeRecord {
+  /** The notice: a due notice (ntd_…, you send) or a Checkbox send (ntc_…). */
+  notice: string;
+  /** Who sends it: you (tracked by Checkbox) or Checkbox Notices. */
+  source: "you_send" | "checkbox_sends";
+  /** Notice kind. */
+  kind: string;
+  /** Human label of the kind. */
+  label: string;
+  /** Which occurrence (the billing cycle or event it is for). */
+  cycle: string;
+  /** Status now (due notice: upcoming, due, sent, overdue, canceled, missed; Checkbox send: sent, failed, bounced, skipped). */
+  status: string;
+  /** Billing-platform subscription id. */
+  subscription: string;
+  /** Billing-platform customer id, when known. */
+  customer: string | null;
+  /** Billing platform. */
+  platform: string;
+  /** SHA-256 of the recipient address (lowercased). Never the address. */
+  recipient_sha256: string | null;
+  /** From header of the email Checkbox holds. */
+  from: string | null;
+  /** The cohort (coh_…) the notice belongs to, for required due notices. */
+  cohort: string | null;
+  /** The send window. */
+  window: {
+    /** Earliest moment the notice satisfies the law. */
+    start: string | null;
+    /** Latest moment. */
+    end: string | null;
+    /** Recommended (or scheduled) send time. */
+    send_at: string | null;
+    /** The event the notice announces. */
+    anchor: string | null;
+  };
+  /** Jurisdictions whose rules set the window. */
+  jurisdictions: Array<string>;
+  /** Catalog requirements behind it. */
+  requirement_ids: Array<string>;
+  /** Rules engine version that computed it. */
+  rules_version: string;
+  /** Legal catalog version. */
+  catalog_version: string;
+  /** The send that closed it, or null. */
+  sent: {
+    /** When it was sent. */
+    at: string;
+    /** api, bcc, dashboard (you send) or checkbox. */
+    source: string;
+    /** Sent after the window closed. */
+    late: boolean;
+    /** Email provider, when known. */
+    provider: string | null;
+    /** Provider message id, when given. */
+    provider_message_id: string | null;
+  } | null;
+  /** How strong the proof of sending is (for a due notice, the full NoticeProof object). */
+  proof: {
+    /** delivered, accepted, copy_received, copy_incomplete, reported_sent or bounced. */
+    level: string | null;
+    /** Plain label. */
+    label: string | null;
+    /** This proof satisfies the notice now. */
+    counts: boolean;
+  };
+  content: NoticeRecordContent;
+  /** History, oldest first. */
+  events: Array<NoticeRecordEvent>;
+}
+
+/** The records of a subscriber's (or a cohort's) notices: content and hashes, windows, rules, proof levels and events. */
+export interface NoticeRecords {
+  /** Always notice_records. */
+  object: "notice_records";
+  /** Live or test-mode subscribers. */
+  livemode: boolean;
+  /** The site. */
+  site: string;
+  /** What these records cover. */
+  scope: {
+    /** The subscriber, when exported per subscriber. */
+    subscription?: string;
+    /** The cohort, when exported per cohort. */
+    cohort?: string;
+    /** True when the cohort has more than 500 subscribers and only the first 500 are included. */
+    cohort_truncated?: boolean;
+  };
+  /** When the document was generated (ISO 8601). */
+  generated: string;
+  /** Rules engine version. */
+  rules_version: string;
+  /** Legal catalog version. */
+  catalog_version: string;
+  /** The schedule approval in force (createNoticePlan / approveNoticePlan), or null. */
+  approval: {
+    /** The approved notice plan (ntcp_…). */
+    plan: string;
+    /** The schedule it approved. */
+    schedule: string;
+    /** Who approved it (a user or API key id, never an email address). */
+    approved_by: string | null;
+    /** When. */
+    approved_at: string;
+  } | null;
+  /** One record per notice, oldest first. */
+  records: Array<NoticeRecord>;
+  /** How to read the records. */
+  note: string;
 }
 
 /** Whether Stripe also sends renewal or trial reminders, and what to do about it. Stripe has no API for these settings, so Checkbox asks. */
@@ -6189,6 +6364,26 @@ export interface ListNoticeCohortsParams {
   site: string;
   /** Preview this schedule. Default: the site's current one. */
   schedule?: "simple" | "minimum_per_state";
+}
+
+/** Parameters of `noticeRecords.list()` (listNoticeRecords). */
+export interface ListNoticeRecordsParams {
+  /** Site (site_…). */
+  site: string;
+  /** One subscriber: the billing-platform subscription id (a timeline of every notice). Give this or cohort. */
+  subscription?: string;
+  /** One cohort (coh_…, from listNoticeCohorts, e.g. coh_3f9a1c2e7b4d): its current members' notices of that kind. Give this or subscription. */
+  cohort?: string;
+}
+
+/** Parameters of `noticeRecords.export()` (exportNoticeRecords). */
+export interface ExportNoticeRecordsParams {
+  /** Site (site_…). */
+  site: string;
+  /** One subscriber: the billing-platform subscription id (a timeline of every notice). Give this or cohort. */
+  subscription?: string;
+  /** One cohort (coh_…, from listNoticeCohorts, e.g. coh_3f9a1c2e7b4d): its current members' notices of that kind. Give this or subscription. */
+  cohort?: string;
 }
 
 /** Parameters of `stripeEmails.retrieve()` (retrieveStripeEmails). */
